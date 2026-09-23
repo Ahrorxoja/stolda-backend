@@ -1,0 +1,30 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 build-essential libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y build-essential libpq-dev \
+    && apt-get autoremove -y
+
+COPY . .
+
+RUN adduser --system --group app \
+    && mkdir -p /srv/media /srv/static \
+    && chown -R app:app /app /srv/media /srv/static
+USER app
+
+EXPOSE 8000
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "3", \
+     "--timeout", "60", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

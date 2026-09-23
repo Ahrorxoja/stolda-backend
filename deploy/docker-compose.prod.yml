@@ -1,0 +1,161 @@
+# Contabo VPS uchun. Ishga tushirish: DEPLOY.md ga qarang.
+#
+# `stolda` (Next.js) va `stolda-backend` (Django) yonma-yon turishi kerak —
+# web servisining build konteksti `../../stolda`.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+  api:
+    build:
+      context: ../
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: ${DOMAIN},www.${DOMAIN},api
+      CSRF_TRUSTED_ORIGINS: https://${DOMAIN},https://www.${DOMAIN}
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN},https://www.${DOMAIN}
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/2
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID}
+      PAYME_KEY: ${PAYME_KEY}
+      CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
+      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
+      CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+      MEDIA_ROOT: /srv/media
+      STATIC_ROOT: /srv/static
+    volumes:
+      - media:/srv/media
+      - static:/srv/static
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # AI tarjima fon vazifalari.
+  worker:
+    build:
+      context: ../
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: celery -A config worker --loglevel=info --concurrency=2
+    environment: &worker_env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: ${DOMAIN},www.${DOMAIN},api
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CACHE_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/2
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID}
+      PAYME_KEY: ${PAYME_KEY}
+      CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
+      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
+      CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+      MEDIA_ROOT: /srv/media
+    volumes:
+      - media:/srv/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Kunlik obuna tekshiruvi (`config/settings.py: CELERY_BEAT_SCHEDULE`).
+  # Alohida jarayon — `worker` uni ishga tushirmaydi.
+  beat:
+    build:
+      context: ../
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: celery -A config beat --loglevel=info
+    environment: *worker_env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: ../../stolda
+      dockerfile: Dockerfile.prod
+      args:
+        # Bo'sh qiymat — brauzer API'ni shu domendan chaqiradi.
+        NEXT_PUBLIC_API_URL: ""
+        MEDIA_URL: https://${DOMAIN}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    restart: unless-stopped
+    environment:
+      # Server tomonidagi render konteyner tarmog'i orqali boradi.
+      API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ""
+      MEDIA_URL: https://${DOMAIN}
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+      - media:/srv/media:ro
+      - static:/srv/static:ro
+    depends_on:
+      - web
+      - api
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    # Har 12 soatda yangilashga urinadi; nginx'ni deploy.sh qayta yuklaydi.
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+             sleep 12h & wait $${!}; done"
+
+volumes:
+  pgdata:
+  media:
+  static:
+  certbot-conf:
+  certbot-www:

@@ -1,0 +1,690 @@
+{
+  "restaurant": {
+    "slug": "zamin",
+    "name": "Zamin",
+    "phone": "+998 90 123 45 67",
+    "instagram": "zamin_restaurant",
+    "service_charge_percent": 20
+  },
+  "ui": {
+    "uz": {
+      "search": "Taom qidirish…",
+      "menu": "Menyu",
+      "catsN": "ta kategoriya",
+      "dishN": "ta taom",
+      "all": "Barchasi",
+      "weight": "Og'irligi",
+      "kkal": "Kaloriyasi",
+      "ingr": "Tarkibi",
+      "waiter": "Buyurtma uchun ofitsiantni chaqiring",
+      "service": "Xizmat haqi 20%",
+      "results": "Qidiruv natijalari",
+      "none": "Hech narsa topilmadi",
+      "noneSub": "Boshqa so'z bilan qidirib ko'ring",
+      "popular": "Mashhur",
+      "veg": "Vegetarian",
+      "powered": "stolda.uz orqali ishlaydi",
+      "cuisine": "Milliy va Yevropa oshxonasi",
+      "address": "Yunusobod tumani, 3-mavze, 12-uy, Toshkent",
+      "hours": "Har kuni 10:00 – 23:00",
+      "cur": "so'm",
+      "kcal": "kkal",
+      "g": "g",
+      "ml": "ml",
+      "cards": "Kartalar",
+      "list": "Ro'yxat"
+    },
+    "ru": {
+      "search": "Поиск блюд…",
+      "menu": "Меню",
+      "catsN": "категорий",
+      "dishN": "блюд",
+      "all": "Все",
+      "weight": "Вес",
+      "kkal": "Калории",
+      "ingr": "Состав",
+      "waiter": "Для заказа позовите официанта",
+      "service": "Обслуживание 20%",
+      "results": "Результаты поиска",
+      "none": "Ничего не найдено",
+      "noneSub": "Попробуйте другое слово",
+      "popular": "Хит",
+      "veg": "Вегетарианское",
+      "powered": "Работает на stolda.uz",
+      "cuisine": "Национальная и европейская кухня",
+      "address": "Юнусабадский район, 3-квартал, дом 12, Ташкент",
+      "hours": "Ежедневно 10:00 – 23:00",
+      "cur": "сум",
+      "kcal": "ккал",
+      "g": "г",
+      "ml": "мл",
+      "cards": "Карточки",
+      "list": "Список"
+    },
+    "en": {
+      "search": "Search dishes…",
+      "menu": "Menu",
+      "catsN": "categories",
+      "dishN": "dishes",
+      "all": "All",
+      "weight": "Weight",
+      "kkal": "Calories",
+      "ingr": "Ingredients",
+      "waiter": "Call a waiter to place your order",
+      "service": "Service charge 20%",
+      "results": "Search results",
+      "none": "Nothing found",
+      "noneSub": "Try a different word",
+      "popular": "Popular",
+      "veg": "Vegetarian",
+      "powered": "Powered by stolda.uz",
+      "cuisine": "Uzbek & European cuisine",
+      "address": "12 Yunusabad-3, Tashkent",
+      "hours": "Daily 10:00 – 23:00",
+      "cur": "sum",
+      "kcal": "kcal",
+      "g": "g",
+      "ml": "ml",
+      "cards": "Cards",
+      "list": "List"
+    }
+  },
+  "categories": [
+    {
+      "id": "issiq",
+      "icon": "cooking-pot",
+      "photo": "dolma",
+      "name": {
+        "uz": "Issiq taomlar",
+        "ru": "Горячие блюда",
+        "en": "Hot dishes"
+      },
+      "sub": {
+        "uz": "An'anaviy milliy taomlar",
+        "ru": "Традиционные блюда",
+        "en": "Traditional Uzbek dishes"
+      }
+    },
+    {
+      "id": "shorva",
+      "icon": "soup",
+      "photo": "",
+      "name": {
+        "uz": "Sho'rvalar",
+        "ru": "Супы",
+        "en": "Soups"
+      },
+      "sub": {
+        "uz": "Isituvchi va to'yimli",
+        "ru": "Согревающие и сытные",
+        "en": "Warm and hearty"
+      }
+    },
+    {
+      "id": "salat",
+      "icon": "salad",
+      "photo": "caesar",
+      "name": {
+        "uz": "Salatlar",
+        "ru": "Салаты",
+        "en": "Salads"
+      },
+      "sub": {
+        "uz": "Yangi va sog'lom",
+        "ru": "Свежие и полезные",
+        "en": "Fresh and light"
+      }
+    },
+    {
+      "id": "shashlik",
+      "icon": "beef",
+      "photo": "",
+      "name": {
+        "uz": "Shashlik",
+        "ru": "Шашлык",
+        "en": "Kebabs"
+      },
+      "sub": {
+        "uz": "Ko'mirda pishirilgan",
+        "ru": "На углях",
+        "en": "Grilled over charcoal"
+      }
+    },
+    {
+      "id": "ichimlik",
+      "icon": "cup-soda",
+      "photo": "",
+      "name": {
+        "uz": "Ichimliklar",
+        "ru": "Напитки",
+        "en": "Drinks"
+      },
+      "sub": {
+        "uz": "Choy va tabiiy ichimliklar",
+        "ru": "Чай и натуральные напитки",
+        "en": "Tea and natural drinks"
+      }
+    },
+    {
+      "id": "shirinlik",
+      "icon": "cake-slice",
+      "photo": "",
+      "name": {
+        "uz": "Shirinliklar",
+        "ru": "Десерты",
+        "en": "Desserts"
+      },
+      "sub": {
+        "uz": "Shirin an'anaviy lazzatlar",
+        "ru": "Традиционные сладости",
+        "en": "Traditional sweets"
+      }
+    }
+  ],
+  "dishes": [
+    {
+      "id": "dolma",
+      "cat": "issiq",
+      "img": "dolma",
+      "price": 42000,
+      "weight": 350,
+      "unit": "g",
+      "kkal": 480,
+      "badge": "popular",
+      "name": {
+        "uz": "Do'lma",
+        "ru": "Долма",
+        "en": "Dolma"
+      },
+      "desc": {
+        "uz": "Uzum bargiga o'ralgan go'sht va guruch, qatiqli sous bilan.",
+        "ru": "Виноградные листья с мясом и рисом под соусом из катыка.",
+        "en": "Grape leaves stuffed with meat and rice, served with yogurt sauce."
+      },
+      "ingr": {
+        "uz": [
+          "Uzum bargi",
+          "Mol go'shti",
+          "Guruch",
+          "Piyoz",
+          "Qatiq",
+          "Ziravorlar"
+        ],
+        "ru": [
+          "Виноградные листья",
+          "Говядина",
+          "Рис",
+          "Лук",
+          "Катык",
+          "Специи"
+        ],
+        "en": [
+          "Grape leaves",
+          "Beef",
+          "Rice",
+          "Onion",
+          "Yogurt",
+          "Spices"
+        ]
+      }
+    },
+    {
+      "id": "osh",
+      "cat": "issiq",
+      "img": "",
+      "price": 45000,
+      "weight": 450,
+      "unit": "g",
+      "kkal": 780,
+      "badge": "popular",
+      "name": {
+        "uz": "Toshkent oshi",
+        "ru": "Ташкентский плов",
+        "en": "Tashkent plov"
+      },
+      "desc": {
+        "uz": "Guruch, sariq sabzi, mol go'shti va ziravorlar bilan an'anaviy osh.",
+        "ru": "Традиционный плов с рисом, жёлтой морковью, говядиной и специями.",
+        "en": "Classic plov with rice, yellow carrots, beef and spices."
+      },
+      "ingr": {
+        "uz": [
+          "Guruch",
+          "Sariq sabzi",
+          "Mol go'shti",
+          "Piyoz",
+          "Zira",
+          "Nahot"
+        ],
+        "ru": [
+          "Рис",
+          "Жёлтая морковь",
+          "Говядина",
+          "Лук",
+          "Зира",
+          "Нут"
+        ],
+        "en": [
+          "Rice",
+          "Yellow carrot",
+          "Beef",
+          "Onion",
+          "Cumin",
+          "Chickpeas"
+        ]
+      }
+    },
+    {
+      "id": "manti",
+      "cat": "issiq",
+      "img": "",
+      "price": 38000,
+      "weight": 400,
+      "unit": "g",
+      "kkal": 620,
+      "badge": "",
+      "name": {
+        "uz": "Manti",
+        "ru": "Манты",
+        "en": "Manti"
+      },
+      "desc": {
+        "uz": "Qo'y go'shti va piyozli bug'da pishgan manti.",
+        "ru": "Паровые манты с бараниной и луком.",
+        "en": "Steamed dumplings with lamb and onion."
+      },
+      "ingr": {
+        "uz": [
+          "Qo'y go'shti",
+          "Piyoz",
+          "Xamir",
+          "Dumba",
+          "Qalampir"
+        ],
+        "ru": [
+          "Баранина",
+          "Лук",
+          "Тесто",
+          "Курдюк",
+          "Перец"
+        ],
+        "en": [
+          "Lamb",
+          "Onion",
+          "Dough",
+          "Tail fat",
+          "Pepper"
+        ]
+      }
+    },
+    {
+      "id": "lagmon",
+      "cat": "shorva",
+      "img": "",
+      "price": 40000,
+      "weight": 500,
+      "unit": "g",
+      "kkal": 580,
+      "badge": "",
+      "name": {
+        "uz": "Lag'mon",
+        "ru": "Лагман",
+        "en": "Lagman"
+      },
+      "desc": {
+        "uz": "Qo'lda cho'zilgan ugra, go'sht va sabzavotli quyuq sho'rva.",
+        "ru": "Тянутая лапша с мясом и овощами в густом бульоне.",
+        "en": "Hand-pulled noodles with beef and vegetables in a rich broth."
+      },
+      "ingr": {
+        "uz": [
+          "Ugra",
+          "Mol go'shti",
+          "Bulg'or qalampiri",
+          "Pomidor",
+          "Sarimsoq"
+        ],
+        "ru": [
+          "Лапша",
+          "Говядина",
+          "Болгарский перец",
+          "Помидор",
+          "Чеснок"
+        ],
+        "en": [
+          "Noodles",
+          "Beef",
+          "Bell pepper",
+          "Tomato",
+          "Garlic"
+        ]
+      }
+    },
+    {
+      "id": "mastava",
+      "cat": "shorva",
+      "img": "",
+      "price": 28000,
+      "weight": 400,
+      "unit": "g",
+      "kkal": 350,
+      "badge": "",
+      "name": {
+        "uz": "Mastava",
+        "ru": "Мастава",
+        "en": "Mastava"
+      },
+      "desc": {
+        "uz": "Guruch va sabzavotli uy sho'rvasi, qatiq bilan.",
+        "ru": "Домашний суп с рисом и овощами, подаётся с катыком.",
+        "en": "Homestyle rice and vegetable soup with yogurt."
+      },
+      "ingr": {
+        "uz": [
+          "Guruch",
+          "Mol go'shti",
+          "Kartoshka",
+          "Sabzi",
+          "Qatiq"
+        ],
+        "ru": [
+          "Рис",
+          "Говядина",
+          "Картофель",
+          "Морковь",
+          "Катык"
+        ],
+        "en": [
+          "Rice",
+          "Beef",
+          "Potato",
+          "Carrot",
+          "Yogurt"
+        ]
+      }
+    },
+    {
+      "id": "sezar",
+      "cat": "salat",
+      "img": "caesar",
+      "price": 45000,
+      "weight": 320,
+      "unit": "g",
+      "kkal": 410,
+      "badge": "popular",
+      "name": {
+        "uz": "Sezar salati",
+        "ru": "Салат «Цезарь»",
+        "en": "Caesar salad"
+      },
+      "desc": {
+        "uz": "Tovuq, romen salati, parmezan, qarsildoq non va sezar sousi.",
+        "ru": "Курица, романо, пармезан, гренки и соус «Цезарь».",
+        "en": "Chicken, romaine, parmesan, croutons and Caesar dressing."
+      },
+      "ingr": {
+        "uz": [
+          "Tovuq",
+          "Romen salati",
+          "Parmezan",
+          "Qarsildoq non",
+          "Pomidor"
+        ],
+        "ru": [
+          "Курица",
+          "Романо",
+          "Пармезан",
+          "Гренки",
+          "Помидор"
+        ],
+        "en": [
+          "Chicken",
+          "Romaine",
+          "Parmesan",
+          "Croutons",
+          "Tomato"
+        ]
+      }
+    },
+    {
+      "id": "kaprez",
+      "cat": "salat",
+      "img": "caprese",
+      "price": 32000,
+      "weight": 280,
+      "unit": "g",
+      "kkal": 210,
+      "badge": "veg",
+      "name": {
+        "uz": "Kaprez salati",
+        "ru": "Салат «Капрезе»",
+        "en": "Caprese salad"
+      },
+      "desc": {
+        "uz": "Yangi mozzarella, pomidor, rukkola va pesto sousi.",
+        "ru": "Свежая моцарелла, томаты, руккола и соус песто.",
+        "en": "Fresh mozzarella, tomatoes, arugula and pesto."
+      },
+      "ingr": {
+        "uz": [
+          "Mozzarella",
+          "Pomidor",
+          "Rukkola",
+          "Pesto",
+          "Balzamik"
+        ],
+        "ru": [
+          "Моцарелла",
+          "Помидор",
+          "Руккола",
+          "Песто",
+          "Бальзамик"
+        ],
+        "en": [
+          "Mozzarella",
+          "Tomato",
+          "Arugula",
+          "Pesto",
+          "Balsamic"
+        ]
+      }
+    },
+    {
+      "id": "rukkola",
+      "cat": "salat",
+      "img": "arugula",
+      "price": 48000,
+      "weight": 240,
+      "unit": "g",
+      "kkal": 260,
+      "badge": "",
+      "name": {
+        "uz": "Rukkola va krevetka",
+        "ru": "Руккола с креветками",
+        "en": "Arugula & shrimp"
+      },
+      "desc": {
+        "uz": "Rukkola, qovurilgan krevetka, parmezan va balzamik sousi.",
+        "ru": "Руккола, жареные креветки, пармезан и бальзамик.",
+        "en": "Arugula, seared shrimp, parmesan and balsamic."
+      },
+      "ingr": {
+        "uz": [
+          "Rukkola",
+          "Krevetka",
+          "Parmezan",
+          "Cherri pomidor",
+          "Balzamik"
+        ],
+        "ru": [
+          "Руккола",
+          "Креветки",
+          "Пармезан",
+          "Черри",
+          "Бальзамик"
+        ],
+        "en": [
+          "Arugula",
+          "Shrimp",
+          "Parmesan",
+          "Cherry tomato",
+          "Balsamic"
+        ]
+      }
+    },
+    {
+      "id": "achchiq",
+      "cat": "salat",
+      "img": "",
+      "price": 18000,
+      "weight": 250,
+      "unit": "g",
+      "kkal": 90,
+      "badge": "veg",
+      "name": {
+        "uz": "Achchiq-chuchuk",
+        "ru": "Ачик-чучук",
+        "en": "Achchiq-chuchuk"
+      },
+      "desc": {
+        "uz": "Pomidor, piyoz va achchiq qalampirdan yangi salat.",
+        "ru": "Свежий салат из помидоров, лука и острого перца.",
+        "en": "Fresh tomato, onion and chili salad."
+      },
+      "ingr": {
+        "uz": [
+          "Pomidor",
+          "Piyoz",
+          "Achchiq qalampir",
+          "Rayhon"
+        ],
+        "ru": [
+          "Помидор",
+          "Лук",
+          "Острый перец",
+          "Базилик"
+        ],
+        "en": [
+          "Tomato",
+          "Onion",
+          "Chili",
+          "Basil"
+        ]
+      }
+    },
+    {
+      "id": "shashlik",
+      "cat": "shashlik",
+      "img": "",
+      "price": 25000,
+      "weight": 150,
+      "unit": "g",
+      "kkal": 390,
+      "badge": "popular",
+      "name": {
+        "uz": "Qo'y go'shti shashlik",
+        "ru": "Шашлык из баранины",
+        "en": "Lamb kebab"
+      },
+      "desc": {
+        "uz": "Ko'mirda pishirilgan yumshoq qo'y go'shti, piyoz bilan.",
+        "ru": "Нежная баранина на углях с луком.",
+        "en": "Tender lamb grilled over charcoal, served with onion."
+      },
+      "ingr": {
+        "uz": [
+          "Qo'y go'shti",
+          "Piyoz",
+          "Zira",
+          "Tuz"
+        ],
+        "ru": [
+          "Баранина",
+          "Лук",
+          "Зира",
+          "Соль"
+        ],
+        "en": [
+          "Lamb",
+          "Onion",
+          "Cumin",
+          "Salt"
+        ]
+      }
+    },
+    {
+      "id": "choy",
+      "cat": "ichimlik",
+      "img": "",
+      "price": 8000,
+      "weight": 800,
+      "unit": "ml",
+      "kkal": 0,
+      "badge": "veg",
+      "name": {
+        "uz": "Ko'k choy",
+        "ru": "Зелёный чай",
+        "en": "Green tea"
+      },
+      "desc": {
+        "uz": "Choynakda demlangan ko'k choy.",
+        "ru": "Зелёный чай в чайнике.",
+        "en": "A pot of freshly brewed green tea."
+      },
+      "ingr": {
+        "uz": [
+          "Ko'k choy",
+          "Suv"
+        ],
+        "ru": [
+          "Зелёный чай",
+          "Вода"
+        ],
+        "en": [
+          "Green tea",
+          "Water"
+        ]
+      }
+    },
+    {
+      "id": "chakchak",
+      "cat": "shirinlik",
+      "img": "",
+      "price": 22000,
+      "weight": 150,
+      "unit": "g",
+      "kkal": 510,
+      "badge": "",
+      "name": {
+        "uz": "Chak-chak",
+        "ru": "Чак-чак",
+        "en": "Chak-chak"
+      },
+      "desc": {
+        "uz": "Asal va yong'oqli an'anaviy shirinlik.",
+        "ru": "Традиционная сладость с мёдом и орехами.",
+        "en": "Traditional honey and walnut sweet."
+      },
+      "ingr": {
+        "uz": [
+          "Un",
+          "Tuxum",
+          "Asal",
+          "Yong'oq"
+        ],
+        "ru": [
+          "Мука",
+          "Яйца",
+          "Мёд",
+          "Орехи"
+        ],
+        "en": [
+          "Flour",
+          "Eggs",
+          "Honey",
+          "Walnuts"
+        ]
+      }
+    }
+  ]
+}

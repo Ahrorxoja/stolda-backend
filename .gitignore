@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Python / Django
+.venv/
+__pycache__/
+*.py[cod]
+staticfiles/
+media/
+db.sqlite3
+
+# Muhit o'zgaruvchilari (.env.example saqlanadi)
+.env
+.env.*
+!.env.example
+
+# Deploy: domenga moslab yaratiladigan nginx konfiguratsiyasi
+deploy/nginx/conf.d/
