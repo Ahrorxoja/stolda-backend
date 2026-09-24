@@ -1,9 +1,8 @@
-"""To'lov muvaffaqiyatli bo'lganda bazani yangilaydigan yagona joy.
+"""Chek tasdiqlanganda bazani yangilaydigan yagona joy.
 
-Payme va Click webhook'lari turli shaklda keladi (JSON-RPC va forma
-POST), lekin ikkalasi ham shu funksiyani chaqiradi — shuning uchun bir xil
-to'lov ikki marta webhook bilan kelsa ham obuna faqat bir marta
-uzaytiriladi (`Invoice.provider_payment_id` unique => `get_or_create`).
+To'lov qo'lda: restoran egasi chek yuklaydi, platforma egasi Telegram'dan
+tasdiqlaydi. Tasdiqlash ikki marta bosilsa ham obuna bir marta uzaytiriladi
+(`Invoice.provider_payment_id` unique).
 """
 
 from datetime import timedelta
@@ -12,33 +11,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from .cache import bump_menu_version
-from .models import Invoice, Subscription
+from .models import Invoice, PaymentReceipt, Subscription
 
 PERIOD_DAYS = {Subscription.Period.MONTH: 30, Subscription.Period.YEAR: 365}
-
-
-@transaction.atomic
-def create_pending_invoice(
-    subscription: Subscription, *, provider_payment_id: str, amount: int
-) -> Invoice:
-    """Payme kabi ikki bosqichli oqim uchun — `CreateTransaction`da chaqiriladi.
-
-    `record_payment` shu qatorni keyin "paid"ga o'tkazadi. Bir martalik
-    (Click, `FakeProvider`) oqimlar buni chaqirmasdan to'g'ridan-to'g'ri
-    `record_payment`ga o'tadi.
-    """
-    invoice, _ = Invoice.objects.get_or_create(
-        provider_payment_id=provider_payment_id,
-        defaults={
-            "subscription": subscription,
-            "amount": amount,
-            "period": subscription.period,
-            "period_start": timezone.now(),
-            "period_end": timezone.now(),
-            "status": Invoice.Status.PENDING,
-        },
-    )
-    return invoice
 
 
 @transaction.atomic
@@ -47,34 +22,39 @@ def record_payment(
     *,
     provider_payment_id: str,
     amount: int,
-    receipt_url: str = "",
+    receipt: PaymentReceipt | None = None,
 ) -> Invoice:
-    """To'lovni "to'landi" deb belgilaydi va obunani darhol tiklaydi/uzaytiradi.
+    """To'lovni yozadi va obunani darhol tiklaydi/uzaytiradi.
 
-    Idempotent — ikkinchi chaqiruv (bir xil `provider_payment_id` bilan
-    takror kelgan webhook) hech narsani qayta o'zgartirmaydi. Ilgari
-    `create_pending_invoice` bilan yaratilgan qator bo'lsa, o'shani "paid"ga
-    o'tkazadi; bo'lmasa, yangisini yaratadi (Click/soxta provayder oqimi).
+    Idempotent — bir xil `provider_payment_id` bilan ikkinchi chaqiruv hech
+    narsani o'zgartirmaydi.
     """
-    invoice = Invoice.objects.select_for_update().filter(
-        provider_payment_id=provider_payment_id
-    ).first()
+    invoice = (
+        Invoice.objects.select_for_update()
+        .filter(provider_payment_id=provider_payment_id)
+        .first()
+    )
     if invoice is not None and invoice.status == Invoice.Status.PAID:
         return invoice
 
     now = timezone.now()
-    period_end = now + timedelta(days=PERIOD_DAYS[subscription.period])
+    # Muddat tugamasdan to'lansa, qolgan kunlar kuymasligi kerak — yangi davr
+    # joriy davrning oxiridan boshlanadi. Muddat o'tib ketgan bo'lsa (past_due,
+    # suspended) hisob bugundan yuritiladi, aks holda to'liq davr berilmasdi.
+    starts_at = max(now, subscription.current_period_end or now)
+    period_end = starts_at + timedelta(days=PERIOD_DAYS[subscription.period])
 
     if invoice is None:
-        invoice = Invoice(subscription=subscription, provider_payment_id=provider_payment_id)
+        invoice = Invoice(
+            subscription=subscription, provider_payment_id=provider_payment_id
+        )
     invoice.amount = amount
     invoice.period = subscription.period
-    invoice.period_start = now
+    invoice.period_start = starts_at
     invoice.period_end = period_end
     invoice.status = Invoice.Status.PAID
     invoice.paid_at = now
-    if receipt_url:
-        invoice.receipt_url = receipt_url
+    invoice.receipt = receipt
     invoice.save()
 
     was_suspended = subscription.status == Subscription.Status.SUSPENDED
@@ -88,3 +68,46 @@ def record_payment(
         bump_menu_version(subscription.restaurant.slug)
 
     return invoice
+
+
+@transaction.atomic
+def approve_receipt(receipt: PaymentReceipt) -> Invoice | None:
+    """Chekni tasdiqlaydi va obunani uzaytiradi.
+
+    Allaqachon ko'rib chiqilgan chek uchun `None` qaytaradi — tugma ikki
+    marta bosilsa ikkinchi hisob-faktura yozilmaydi.
+    """
+    fresh = PaymentReceipt.objects.select_for_update().get(pk=receipt.pk)
+    if fresh.status != PaymentReceipt.Status.PENDING:
+        return None
+
+    subscription = fresh.subscription
+    # To'langan davr tanlanganidan farq qilishi mumkin — chekdagisiga moslaymiz.
+    if subscription.period != fresh.period:
+        subscription.period = fresh.period
+        subscription.save(update_fields=["period"])
+
+    fresh.status = PaymentReceipt.Status.APPROVED
+    fresh.reviewed_at = timezone.now()
+    fresh.save(update_fields=["status", "reviewed_at"])
+
+    return record_payment(
+        subscription,
+        provider_payment_id=f"receipt_{fresh.pk}",
+        amount=fresh.amount,
+        receipt=fresh,
+    )
+
+
+@transaction.atomic
+def reject_receipt(receipt: PaymentReceipt, note: str = "") -> bool:
+    """Chekni rad etadi. Obunaga tegilmaydi. Qayta rad etilsa `False`."""
+    fresh = PaymentReceipt.objects.select_for_update().get(pk=receipt.pk)
+    if fresh.status != PaymentReceipt.Status.PENDING:
+        return False
+
+    fresh.status = PaymentReceipt.Status.REJECTED
+    fresh.note = note
+    fresh.reviewed_at = timezone.now()
+    fresh.save(update_fields=["status", "note", "reviewed_at"])
+    return True

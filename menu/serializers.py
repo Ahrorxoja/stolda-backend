@@ -6,7 +6,7 @@ almashtiradi, qayta so'rov yubormaydi.
 
 from rest_framework import serializers
 
-from .models import Category, Dish, MenuView, Restaurant, Table, ViewKind
+from .models import Category, Dish, MenuView, Restaurant, ViewKind
 
 
 class ImageUrlMixin:
@@ -30,9 +30,12 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "primary_language",
             "cuisine",
             "address",
-            "hours",
+            "working_hours",
             "phone",
+            "extra_phones",
             "instagram",
+            "facebook",
+            "telegram",
             "logo",
             "cover",
             "service_charge_percent",
@@ -48,13 +51,40 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
 class CategorySerializer(ImageUrlMixin, serializers.ModelSerializer):
     photo = serializers.SerializerMethodField()
     dish_count = serializers.SerializerMethodField()
+    #: Vaqt chegarasi bo'lsa — `"08:00"` ko'rinishida, aks holda `None`.
+    available_from = serializers.SerializerMethodField()
+    available_to = serializers.SerializerMethodField()
+    #: Hozir beriladimi. Server hisoblaydi — restoran vaqt mintaqasi muhim,
+    #: mijozning qurilma soati emas.
+    open_now = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ("id", "name", "subtitle", "icon", "photo", "position", "dish_count")
+        fields = (
+            "id",
+            "name",
+            "subtitle",
+            "icon",
+            "photo",
+            "position",
+            "dish_count",
+            "available_from",
+            "available_to",
+            "open_now",
+        )
 
     def get_photo(self, obj: Category) -> str | None:
         return self._image_url(obj.photo)
+
+    def get_available_from(self, obj: Category) -> str | None:
+        return obj.visible_from.strftime("%H:%M") if obj.visible_from else None
+
+    def get_available_to(self, obj: Category) -> str | None:
+        return obj.visible_to.strftime("%H:%M") if obj.visible_to else None
+
+    def get_open_now(self, obj: Category) -> bool:
+        now = self.context.get("now")
+        return obj.is_open_at(now) if now is not None else True
 
     def get_dish_count(self, obj: Category) -> int:
         # Odatda view'da `available_dishes` bo'lib prefetch qilinadi.
@@ -67,6 +97,8 @@ class CategorySerializer(ImageUrlMixin, serializers.ModelSerializer):
 class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
     #: `photo` — asosiy rasm (moslik uchun), `photos` — hammasi.
     photo = serializers.SerializerMethodField()
+    #: Kesilmagan asl nusxa — mijoz rasmni bosganda to'liq holida ko'radi.
+    photo_original = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
     category = serializers.IntegerField(source="category_id")
 
@@ -83,6 +115,7 @@ class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "unit",
             "kcal",
             "photo",
+            "photo_original",
             "photos",
             "badges",
             "position",
@@ -91,6 +124,15 @@ class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
     def get_photo(self, obj: Dish) -> str | None:
         photos = self._photo_list(obj)
         return photos[0] if photos else None
+
+    def get_photo_original(self, obj: Dish) -> str | None:
+        photos = getattr(obj, "gallery", None)
+        if photos is None:
+            photos = list(obj.photos.all()[:1])
+        if not photos:
+            return None
+        # Asl nusxa bo'lmasa (eski rasmlar) — kesilganini qaytaramiz.
+        return self._image_url(photos[0].original) or self._image_url(photos[0].image)
 
     def get_photos(self, obj: Dish) -> list[str]:
         return self._photo_list(obj)
@@ -108,7 +150,6 @@ class MenuViewCreateSerializer(serializers.Serializer):
 
     kind = serializers.ChoiceField(choices=ViewKind.choices)
     dish = serializers.IntegerField(required=False, allow_null=True)
-    table = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     def __init__(self, *args, restaurant: Restaurant, **kwargs):
         self.restaurant = restaurant
@@ -124,12 +165,6 @@ class MenuViewCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Bu restoranda bunday taom yo'q.")
         return dish
 
-    def validate_table(self, value):
-        if not value:
-            return None
-        # Noto'g'ri QR token hodisani yo'qotmaydi — shunchaki stol biriktirilmaydi.
-        return Table.objects.filter(qr_token=value, restaurant=self.restaurant).first()
-
     def validate(self, attrs):
         if attrs.get("kind") == ViewKind.DISH_OPEN and not attrs.get("dish"):
             raise serializers.ValidationError(
@@ -141,6 +176,5 @@ class MenuViewCreateSerializer(serializers.Serializer):
         return MenuView.objects.create(
             restaurant=self.restaurant,
             dish=validated_data.get("dish"),
-            table=validated_data.get("table"),
             kind=validated_data["kind"],
         )

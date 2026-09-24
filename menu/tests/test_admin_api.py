@@ -7,7 +7,7 @@ from django.test.client import MULTIPART_CONTENT, encode_multipart
 from django.urls import reverse
 from PIL import Image
 
-from menu.models import Category, Dish, Restaurant, Table
+from menu.models import Category, Dish, Restaurant
 from menu.phones import normalize_phone
 
 from .factories import make_category, make_dish, make_plan, make_restaurant
@@ -229,6 +229,102 @@ class PhotoUploadTests(AdminApiTestCase):
         self.assertLessEqual(max(Image.open(dish.photos.get().image.path).size), 1600)
 
 
+@NO_CACHE
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DishPhotoPatchTests(AdminApiTestCase):
+    """`PATCH /api/dishes/{id}/` orqali asosiy rasmni almashtirish.
+
+    Ilgari `photo` serializer'da yozilmaydigan maydon edi: server 200
+    qaytarardi-yu, rasm saqlanmasdi. Panel aynan shu yo'ldan yuklaydi.
+    """
+
+    def patch_photo(self, dish, **files):
+        return self.client.patch(
+            f"/api/dishes/{dish.pk}/",
+            encode_multipart("BoUnDaRy", files),
+            content_type=MULTIPART_CONTENT.replace("BoUnDaRyStRiNg", "BoUnDaRy"),
+            **self.auth(),
+        )
+
+    def test_patching_a_photo_creates_the_first_photo(self):
+        dish = make_dish(self.category)
+
+        response = self.patch_photo(dish, photo=png_bytes())
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(dish.photos.count(), 1)
+        self.assertIsNotNone(response.json()["photo_url"])
+
+    def test_original_is_kept_beside_the_cropped_copy(self):
+        """Menyuda kesilgani, bosilganda asl nusxasi ko'rinadi."""
+        dish = make_dish(self.category)
+
+        response = self.patch_photo(
+            dish,
+            photo=png_bytes("kesilgan.png", size=(716, 296)),
+            photo_original=png_bytes("asl.png", size=(1200, 1600)),
+        )
+
+        photo = dish.photos.get()
+        self.assertTrue(photo.image.name.endswith(".webp"))
+        self.assertTrue(photo.original.name.endswith(".webp"))
+        # Asl nusxa boshqa papkada va boshqa shaklda saqlanadi.
+        self.assertIn("originals/", photo.original.name)
+        self.assertNotEqual(
+            Image.open(photo.image.path).size, Image.open(photo.original.path).size
+        )
+        self.assertIsNotNone(response.json()["photo_original_url"])
+
+    def test_patching_again_replaces_the_same_photo(self):
+        dish = make_dish(self.category)
+        self.patch_photo(dish, photo=png_bytes("birinchi.png"))
+
+        self.patch_photo(dish, photo=png_bytes("ikkinchi.png"))
+
+        self.assertEqual(dish.photos.count(), 1)
+
+    def test_public_menu_serves_both_copies(self):
+        dish = make_dish(self.category)
+        self.patch_photo(dish, photo=png_bytes(), photo_original=png_bytes("asl.png"))
+
+        body = self.client.get(reverse("public-menu", args=[self.restaurant.slug])).json()
+
+        served = body["dishes"][0]
+        self.assertIsNotNone(served["photo"])
+        self.assertIsNotNone(served["photo_original"])
+        self.assertNotEqual(served["photo"], served["photo_original"])
+
+    def test_old_photos_without_an_original_fall_back_to_the_cropped_copy(self):
+        """Eski rasmlarda asl nusxa yo'q — mijozga bo'sh havola ketmasin."""
+        dish = make_dish(self.category)
+        self.patch_photo(dish, photo=png_bytes())
+
+        body = self.client.get(reverse("public-menu", args=[self.restaurant.slug])).json()
+
+        served = body["dishes"][0]
+        self.assertEqual(served["photo_original"], served["photo"])
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class CategoryPhotoTests(AdminApiTestCase):
+    def test_category_keeps_the_original_beside_the_cover(self):
+        response = self.client.patch(
+            f"/api/categories/{self.category.pk}/",
+            encode_multipart(
+                "BoUnDaRy",
+                {"photo": png_bytes("muqova.png"), "photo_original": png_bytes("asl.png")},
+            ),
+            content_type=MULTIPART_CONTENT.replace("BoUnDaRyStRiNg", "BoUnDaRy"),
+            **self.auth(),
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.category.refresh_from_db()
+        self.assertTrue(self.category.photo.name.endswith(".webp"))
+        self.assertIn("originals/", self.category.photo_original.name)
+        self.assertIsNotNone(response.json()["photo_original_url"])
+
+
 class PlanLimitApiTests(AdminApiTestCase):
     """Bepul tarif yo'q endi — mexanizm `subscription.plan.features` orqali ishlaydi."""
 
@@ -288,6 +384,47 @@ class StatsTests(AdminApiTestCase):
         self.assertEqual(body["top_dishes"][0]["views"], 3)
         self.assertEqual(len(body["daily"]), 7)
 
+    def test_daily_separates_dish_opens_from_scans(self):
+        """Grafik kartadagi raqam bilan mos bo'lishi kerak.
+
+        Ilgari kunlik ustun ikkalasini qo'shib ko'rsatar va "Haftalik
+        ko'rishlar" kartasidan katta chiqib, statistika buzuqdek tuyulardi.
+        """
+        dish = make_dish(self.category)
+        self.client.post(
+            reverse("public-views", args=[self.restaurant.slug]),
+            {"kind": "scan"},
+            content_type="application/json",
+        )
+        for _ in range(3):
+            self.client.post(
+                reverse("public-views", args=[self.restaurant.slug]),
+                {"kind": "dish_open", "dish": dish.pk},
+                content_type="application/json",
+            )
+
+        body = self.client.get(reverse("stats") + "?range=week", **self.auth()).json()
+
+        today = body["daily"][-1]
+        self.assertEqual(today["dish_opens"], 3)
+        self.assertEqual(today["scans"], 1)
+        self.assertEqual(today["views"], 4)
+        # Kartadagi raqam — ustunlarning oltin qismlari yig'indisi.
+        self.assertEqual(
+            sum(day["dish_opens"] for day in body["daily"]),
+            body["period"]["dish_opens"],
+        )
+        self.assertEqual(
+            sum(day["scans"] for day in body["daily"]), body["period"]["scans"]
+        )
+
+    def test_empty_days_are_still_listed(self):
+        body = self.client.get(reverse("stats") + "?range=week", **self.auth()).json()
+
+        self.assertEqual(len(body["daily"]), 7)
+        self.assertTrue(all(day["dish_opens"] == 0 for day in body["daily"]))
+        self.assertTrue(all(day["scans"] == 0 for day in body["daily"]))
+
     def test_reports_hidden_dish_count(self):
         make_dish(self.category)
         make_dish(self.category, is_available=False)
@@ -297,28 +434,31 @@ class StatsTests(AdminApiTestCase):
         self.assertEqual(body["dishes"], {"total": 2, "hidden": 1})
 
 
-class TableQrTests(AdminApiTestCase):
-    def setUp(self):
-        super().setUp()
-        self.table = Table.objects.create(restaurant=self.restaurant, number="5")
+class RestaurantQrTests(AdminApiTestCase):
+    """Restoranda bitta QR — stollar yo'q, shuning uchun bitta havola yetarli."""
 
-    def test_downloads_a_png_for_one_table(self):
-        response = self.client.get(f"/api/tables/{self.table.pk}/qr.png/", **self.auth())
+    def qr(self, fmt: str):
+        return self.client.get(
+            f"/api/restaurants/{self.restaurant.pk}/qr/?format={fmt}", **self.auth()
+        )
+
+    def test_downloads_a_png(self):
+        response = self.qr("png")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "image/png")
 
-    def test_downloads_a_printable_pdf_for_every_table(self):
-        response = self.client.get("/api/tables/qr.pdf/", **self.auth())
+    def test_downloads_printable_a6_and_a4_pdfs(self):
+        for fmt in ("a6", "a4"):
+            with self.subTest(fmt=fmt):
+                response = self.qr(fmt)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "application/pdf")
-        self.assertTrue(response.content.startswith(b"%PDF"))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], "application/pdf")
+                self.assertTrue(response.content.startswith(b"%PDF"))
 
-    def test_pdf_is_not_found_when_there_are_no_tables(self):
-        Table.objects.all().delete()
-
-        self.assertEqual(self.client.get("/api/tables/qr.pdf/", **self.auth()).status_code, 404)
+    def test_unknown_format_is_rejected(self):
+        self.assertEqual(self.qr("svg").status_code, 400)
 
 
 class MenuCacheTests(AdminApiTestCase):

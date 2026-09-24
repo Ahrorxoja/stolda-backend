@@ -16,6 +16,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Restaurant
+from .members import accept_pending_for
 from .phones import normalize_phone
 from .slugs import unique_slug
 
@@ -54,6 +55,8 @@ class PhoneTokenObtainSerializer(TokenObtainPairSerializer):
 
 class PhoneTokenObtainView(TokenObtainPairView):
     serializer_class = PhoneTokenObtainSerializer
+    #: Parolni tanlab ko'rishga qarshi.
+    throttle_scope = "login"
 
 
 def create_owner(phone: str, password: str, **extra):
@@ -99,6 +102,7 @@ class SignupView(APIView):
 
     permission_classes = (AllowAny,)
     authentication_classes = ()
+    throttle_scope = "signup"
 
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
@@ -146,6 +150,9 @@ class GoogleAuthSerializer(serializers.Serializer):
         if created:
             user.set_unusable_password()
             user.save(update_fields=["password"])
+        # Menejer havolani yo'qotgan bo'lsa ham kirishi uchun: shu pochtaga
+        # yuborilgan taklif shu yerda qabul qilinadi.
+        accept_pending_for(user)
         return user
 
 
@@ -158,6 +165,7 @@ class GoogleAuthView(APIView):
 
     permission_classes = (AllowAny,)
     authentication_classes = ()
+    throttle_scope = "signup"
 
     def post(self, request):
         serializer = GoogleAuthSerializer(data=request.data)

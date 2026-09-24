@@ -25,7 +25,7 @@ class Field:
 TRANSLATABLE: dict[str, tuple[Field, ...]] = {
     "Dish": (Field("name"), Field("description"), Field("ingredients", is_list=True)),
     "Category": (Field("name"), Field("subtitle")),
-    "Restaurant": (Field("cuisine"), Field("address"), Field("hours")),
+    "Restaurant": (Field("cuisine"), Field("address")),
 }
 
 LIST_SEPARATOR = "\n"

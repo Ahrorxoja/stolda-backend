@@ -15,6 +15,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
+from menu.hours import DAYS, day_hours
 from menu.models import (
     Category,
     Dish,
@@ -23,7 +24,6 @@ from menu.models import (
     Plan,
     Restaurant,
     Subscription,
-    Table,
     ViewKind,
 )
 from menu import translation_sync as sync
@@ -36,7 +36,6 @@ FOOD_DIR = Path(settings.BASE_DIR) / "assets" / "food"
 # Admin panelga telefon raqami bilan kiriladi, shuning uchun username — raqam.
 DEMO_OWNER_PHONE = "+998 90 123 45 67"
 DEMO_OWNER_PASSWORD = "demo12345"
-TABLE_COUNT = 8
 VIEW_DAYS = 30
 #: Namuna menyu shu tillarda yozilgan.
 LANGUAGES_IN_SAMPLE = ("uz", "ru", "en")
@@ -83,7 +82,7 @@ class Command(BaseCommand):
                 name=meta["name"],
                 cuisine=translations(ui, "cuisine"),
                 address=translations(ui, "address"),
-                hours=translations(ui, "hours"),
+                working_hours=demo_working_hours(),
                 phone=meta.get("phone", ""),
                 instagram=meta.get("instagram", ""),
                 service_charge_percent=meta.get("service_charge_percent", 0),
@@ -137,16 +136,11 @@ class Command(BaseCommand):
                 dish.save()
                 self._attach_dish_photo(dish, item.get("img"))
 
-            tables = [
-                Table.objects.create(restaurant=restaurant, number=str(number))
-                for number in range(1, TABLE_COUNT + 1)
-            ]
-            views = self._seed_views(restaurant, tables)
+            views = self._seed_views(restaurant)
 
         self.report(
             self.style.SUCCESS(
                 f"'{restaurant.slug}' tayyor: {len(categories)} kategoriya, "
-                f"{restaurant.dish_count} taom, {TABLE_COUNT} stol, "
                 f"{views} ta ko'rish hodisasi."
             )
         )
@@ -175,7 +169,7 @@ class Command(BaseCommand):
             )
         return owner
 
-    def _seed_views(self, restaurant: Restaurant, tables: list[Table]) -> int:
+    def _seed_views(self, restaurant: Restaurant) -> int:
         """Admin paneldagi statistika bo'sh ko'rinmasligi uchun namuna ko'rishlar.
 
         Mashhur taomlar ko'proq ochilgan bo'ladi, dam olish kunlari bandroq.
@@ -198,7 +192,6 @@ class Command(BaseCommand):
                 events.append(
                     MenuView(
                         restaurant=restaurant,
-                        table=rng.choice(tables),
                         kind=ViewKind.SCAN,
                         created_at=created,
                     )
@@ -208,7 +201,6 @@ class Command(BaseCommand):
                         MenuView(
                             restaurant=restaurant,
                             dish=dish,
-                            table=None,
                             kind=ViewKind.DISH_OPEN,
                             created_at=created,
                         )
@@ -250,3 +242,10 @@ class Command(BaseCommand):
             self.report(self.style.WARNING(f"Rasm topilmadi: {path}"))
             return None
         return path
+
+
+def demo_working_hours() -> dict:
+    """Namuna restoran: hafta ichi 10:00–23:00, yakshanba dam olish."""
+    return {
+        day: day_hours("10:00", "23:00", closed=day == "sun") for day in DAYS
+    }

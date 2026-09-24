@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 
 from django.db.models.functions import TruncDate
 
-from menu.models import Category, Dish, MenuView, Restaurant, Table, ViewKind
+from menu.models import Category, Dish, MenuView, Restaurant, ViewKind
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
@@ -18,7 +18,6 @@ class SeedDemoTests(TestCase):
         self.assertEqual(restaurant.cuisine["ru"], "Национальная и европейская кухня")
         self.assertEqual(Category.objects.count(), 6)
         self.assertEqual(Dish.objects.count(), 12)
-        self.assertEqual(Table.objects.count(), 8)
 
     def test_dishes_keep_their_translations_and_badges(self):
         call_command("seed_demo", verbosity=0)
@@ -50,7 +49,6 @@ class SeedDemoTests(TestCase):
 
         self.assertEqual(Restaurant.objects.filter(slug="zamin").count(), 1)
         self.assertEqual(Dish.objects.count(), 12)
-        self.assertEqual(Table.objects.count(), 8)
 
     def test_sample_translations_are_kept_as_hand_written(self):
         """Namunadagi ruscha matnni AI qayta yozib yubormasligi kerak."""

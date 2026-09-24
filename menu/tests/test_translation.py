@@ -285,7 +285,12 @@ class TranslatePreviewTests(AdminApiTestCase):
 
 @NO_CACHE
 class CategoryScheduleTests(TestCase):
-    """"Faqat belgilangan vaqtda" — mijoz menyusi Toshkent vaqti bo'yicha filtrlaydi."""
+    """"Faqat belgilangan vaqtda" — kategoriya yashirinmaydi, belgilanadi.
+
+    Menyu to'la ko'rinishi kerak: mijoz nima borligini ko'rib tursin va
+    qachon berilishini `open_now` belgisidan bilsin. Faqat egasi qo'lda
+    yashirgani (`is_visible=False`) menyudan butunlay chiqib ketadi.
+    """
 
     def setUp(self):
         self.restaurant = make_restaurant()
@@ -302,17 +307,37 @@ class CategoryScheduleTests(TestCase):
         with patch("menu.views.timezone.localtime", return_value=moment):
             return self.client.get(self.url).json()
 
-    def test_visible_inside_the_window(self):
-        self.assertEqual(len(self.menu_at(9)["categories"]), 1)
+    def test_inside_the_window_it_is_marked_open(self):
+        category = self.menu_at(9)["categories"][0]
 
-    def test_hidden_before_the_window(self):
-        self.assertEqual(self.menu_at(7)["categories"], [])
+        self.assertTrue(category["open_now"])
+        self.assertEqual(category["available_from"], "08:00")
+        self.assertEqual(category["available_to"], "11:30")
 
-    def test_hidden_after_the_window(self):
-        self.assertEqual(self.menu_at(12)["categories"], [])
+    def test_before_the_window_it_still_shows_but_is_marked_closed(self):
+        body = self.menu_at(7)
 
-    def test_dishes_of_a_hidden_category_are_hidden_too(self):
-        self.assertEqual(self.menu_at(12)["dishes"], [])
+        self.assertEqual(len(body["categories"]), 1)
+        self.assertFalse(body["categories"][0]["open_now"])
+
+    def test_after_the_window_it_still_shows_but_is_marked_closed(self):
+        body = self.menu_at(12)
+
+        self.assertEqual(len(body["categories"]), 1)
+        self.assertFalse(body["categories"][0]["open_now"])
+
+    def test_its_dishes_stay_in_the_menu_outside_the_window(self):
+        """Menyu to'la tursin — aks holda kechqurun menyu bo'sh ko'rinardi."""
+        self.assertEqual(len(self.menu_at(12)["dishes"]), 1)
+
+    def test_a_category_without_a_window_has_no_times_and_is_open(self):
+        make_category(self.restaurant, position=1)
+
+        plain = next(c for c in self.menu_at(12)["categories"] if c["position"] == 1)
+
+        self.assertIsNone(plain["available_from"])
+        self.assertIsNone(plain["available_to"])
+        self.assertTrue(plain["open_now"])
 
     def test_window_may_cross_midnight(self):
         night = make_category(
@@ -324,10 +349,14 @@ class CategoryScheduleTests(TestCase):
         self.assertFalse(night.is_open_at(_at(12)))
 
     def test_hidden_category_never_shows(self):
+        """Qo'lda yashirilgani boshqa gap — u umuman chiqmaydi."""
         self.breakfast.is_visible = False
         self.breakfast.save(update_fields=["is_visible"])
 
-        self.assertEqual(self.menu_at(9)["categories"], [])
+        body = self.menu_at(9)
+
+        self.assertEqual(body["categories"], [])
+        self.assertEqual(body["dishes"], [])
 
 
 def _at(hour: int):

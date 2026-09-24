@@ -22,12 +22,12 @@ from rest_framework.views import APIView
 from translation import TranslationError, get_translator
 
 from .admin_serializers import (
+    ProfileSerializer,
     CategoryAdminSerializer,
     DishAdminSerializer,
     DishPhotoSerializer,
     PositionSerializer,
     RestaurantAdminSerializer,
-    TableSerializer,
     TranslatePreviewSerializer,
 )
 from .models import (
@@ -36,12 +36,13 @@ from .models import (
     DishPhoto,
     MenuView,
     Plan,
+    Profile,
     Restaurant,
+    RestaurantMember,
     Subscription,
-    Table,
     ViewKind,
 )
-from .permissions import IsRestaurantOwner
+from .permissions import IsRestaurantMember, member_restaurant_ids
 from .phones import normalize_phone
 from .slugs import RESERVED_SLUGS, normalize_slug
 from .tasks import retranslate_restaurant
@@ -52,7 +53,7 @@ RANGES = {"day": 1, "week": 7, "month": 30}
 
 
 class OwnerScopedViewSet(viewsets.ModelViewSet):
-    permission_classes = (IsAuthenticated, IsRestaurantOwner)
+    permission_classes = (IsAuthenticated, IsRestaurantMember)
 
     def reorder(self, request):
         """`POST .../reorder/` — `[{"id": …, "position": …}]`."""
@@ -77,19 +78,19 @@ class OwnerScopedViewSet(viewsets.ModelViewSet):
         from .cache import bump_menu_version
 
         for slug in Restaurant.objects.filter(
-            owner=self.request.user
+            pk__in=member_restaurant_ids(self.request.user)
         ).values_list("slug", flat=True):
             bump_menu_version(slug)
 
 
 class RestaurantViewSet(viewsets.ModelViewSet):
     serializer_class = RestaurantAdminSerializer
-    permission_classes = (IsAuthenticated, IsRestaurantOwner)
+    permission_classes = (IsAuthenticated, IsRestaurantMember)
 
     TRIAL_DAYS = 14
 
     def get_queryset(self):
-        return Restaurant.objects.filter(owner=self.request.user)
+        return Restaurant.objects.filter(pk__in=member_restaurant_ids(self.request.user))
 
     def perform_create(self, serializer):
         """Yangi restoran — 14 kunlik sinov, faqat bir marta va telefon bo'yicha.
@@ -109,6 +110,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
         now = timezone.now()
         with transaction.atomic():
+            # A'zolik `signals.ensure_owner_membership` da beriladi.
             restaurant = serializer.save(owner=self.request.user, trial_used_at=now)
             Subscription.objects.create(
                 restaurant=restaurant,
@@ -173,7 +175,7 @@ class CategoryViewSet(OwnerScopedViewSet):
 
     def get_queryset(self):
         return Category.objects.filter(
-            restaurant__owner=self.request.user
+            restaurant_id__in=member_restaurant_ids(self.request.user)
         ).select_related("restaurant")
 
     def perform_destroy(self, instance: Category):
@@ -203,7 +205,9 @@ class DishViewSet(OwnerScopedViewSet):
     def get_queryset(self):
         # Tahrirlagichda taomlar kategoriya tartibida, ichida esa o'z tartibida.
         queryset = (
-            Dish.objects.filter(category__restaurant__owner=self.request.user)
+            Dish.objects.filter(
+                category__restaurant_id__in=member_restaurant_ids(self.request.user)
+            )
             .select_related("category", "category__restaurant")
             .order_by("category__position", "category_id", "position", "id")
         )
@@ -217,44 +221,6 @@ class DishViewSet(OwnerScopedViewSet):
         return super().reorder(request)
 
 
-class TableViewSet(OwnerScopedViewSet):
-    serializer_class = TableSerializer
-
-    def get_queryset(self):
-        return Table.objects.filter(
-            restaurant__owner=self.request.user
-        ).select_related("restaurant")
-
-    @action(detail=True, methods=["get"], url_path="qr.png")
-    def qr_png(self, request, pk=None):
-        table = self.get_object()
-        buffer = io.BytesIO()
-        _qr_image(table.qr_url).save(buffer, format="PNG")
-        buffer.seek(0)
-        return FileResponse(
-            buffer,
-            content_type="image/png",
-            as_attachment=True,
-            filename=f"stol-{table.number}.png",
-        )
-
-    @action(detail=False, methods=["get"], url_path="qr.pdf")
-    def qr_pdf(self, request):
-        """Hamma stollar uchun chop etiladigan PDF — bir sahifada 2×3 ta QR."""
-        tables = list(self.get_queryset())
-        if not tables:
-            return Response(
-                {"detail": "Hali stol qo'shilmagan."}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        buffer = io.BytesIO()
-        _draw_qr_sheet(buffer, tables)
-        buffer.seek(0)
-        response = HttpResponse(buffer.read(), content_type="application/pdf")
-        response["Content-Disposition"] = 'attachment; filename="stollar-qr.pdf"'
-        return response
-
-
 class DishPhotoViewSet(OwnerScopedViewSet):
     """Taom rasmlari — bir taomda bir nechta bo'lishi mumkin."""
 
@@ -262,7 +228,7 @@ class DishPhotoViewSet(OwnerScopedViewSet):
 
     def get_queryset(self):
         queryset = DishPhoto.objects.filter(
-            dish__category__restaurant__owner=self.request.user
+            dish__category__restaurant_id__in=member_restaurant_ids(self.request.user)
         ).select_related("dish", "dish__category", "dish__category__restaurant")
         dish = self.request.query_params.get("dish")
         return queryset.filter(dish_id=dish) if dish else queryset
@@ -298,7 +264,7 @@ class TranslatePreviewView(APIView):
         data = serializer.validated_data
 
         restaurant = Restaurant.objects.filter(
-            pk=data["restaurant"], owner=request.user
+            pk=data["restaurant"], pk__in=member_restaurant_ids(request.user)
         ).first()
         if restaurant is None:
             raise PermissionDenied("Restoran topilmadi.")
@@ -344,17 +310,47 @@ class TranslatePreviewView(APIView):
 
 
 class MeView(APIView):
-    """Kirgan foydalanuvchi va uning restoranlari."""
+    """Kirgan foydalanuvchi, uning restoranlari va aloqa ma'lumotlari.
+
+    `PATCH` — hisob sozlamalari (ism, aloqa telefoni, Telegram). Bu ma'lumot
+    mijozga ko'rinmaydi; platforma egasi bog'lanishi uchun.
+    """
 
     permission_classes = (IsAuthenticated,)
 
+    @staticmethod
+    def _profile(user) -> Profile:
+        profile, _ = Profile.objects.get_or_create(user=user)
+        return profile
+
+    def patch(self, request):
+        serializer = ProfileSerializer(
+            self._profile(request.user), data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
     def get(self, request):
-        restaurants = Restaurant.objects.filter(owner=request.user)
+        restaurants = Restaurant.objects.filter(pk__in=member_restaurant_ids(request.user))
+        #: Rol sahifalarni yashirish uchun kerak — to'lov faqat egasida.
+        roles = dict(
+            RestaurantMember.objects.filter(user=request.user).values_list(
+                "restaurant_id", "role"
+            )
+        )
         return Response(
             {
                 "id": request.user.id,
                 "phone": request.user.username,
-                "name": request.user.get_full_name() or request.user.username,
+                "name": (
+                    self._profile(request.user).full_name
+                    or request.user.get_full_name()
+                    or request.user.username
+                ),
+                "profile": ProfileSerializer(self._profile(request.user)).data,
+                "role": next(iter(roles.values()), None),
+                "roles": {str(key): value for key, value in roles.items()},
                 "restaurants": RestaurantAdminSerializer(
                     restaurants, many=True, context={"request": request}
                 ).data,
@@ -430,7 +426,7 @@ class StatsView(APIView):
         )
 
     def _restaurant(self, request) -> Restaurant:
-        queryset = Restaurant.objects.filter(owner=request.user)
+        queryset = Restaurant.objects.filter(pk__in=member_restaurant_ids(request.user))
         restaurant_id = request.query_params.get("restaurant")
         if restaurant_id:
             queryset = queryset.filter(pk=restaurant_id)
@@ -468,20 +464,37 @@ class StatsView(APIView):
         ]
 
     def _daily(self, views, since, days: int) -> list[dict]:
-        counts = {
-            row["day"]: row["total"]
-            for row in views.filter(created_at__gte=since)
+        """Kunlik ustunlar — taom ochilishi va QR skanerlari alohida.
+
+        Ilgari ikkalasi bitta songa qo'shilardi va grafik kartadagi raqamdan
+        katta chiqib, statistika noto'g'ri ishlayotgandek ko'rinardi.
+        """
+        rows = (
+            views.filter(created_at__gte=since)
             .annotate(day=TruncDate("created_at"))
             .values("day")
-            .annotate(total=Count("id"))
-        }
-        return [
-            {
-                "date": (since + timedelta(days=offset)).date().isoformat(),
-                "views": counts.get((since + timedelta(days=offset)).date(), 0),
-            }
-            for offset in range(days)
-        ]
+            .annotate(
+                opens=Count("id", filter=Q(kind=ViewKind.DISH_OPEN)),
+                scans=Count("id", filter=Q(kind=ViewKind.SCAN)),
+            )
+        )
+        counts = {row["day"]: row for row in rows}
+        result = []
+        for offset in range(days):
+            day = (since + timedelta(days=offset)).date()
+            row = counts.get(day)
+            opens = row["opens"] if row else 0
+            scans = row["scans"] if row else 0
+            result.append(
+                {
+                    "date": day.isoformat(),
+                    "dish_opens": opens,
+                    "scans": scans,
+                    #: Moslik uchun — ikkalasining yig'indisi.
+                    "views": opens + scans,
+                }
+            )
+        return result
 
 
 def _change(current: int, previous: int) -> float | None:
@@ -496,38 +509,6 @@ def _qr_image(url: str):
     qr.add_data(url)
     qr.make(fit=True)
     return qr.make_image(fill_color="#231C17", back_color="#FFFCF8").convert("RGB")
-
-
-def _draw_qr_sheet(buffer, tables) -> None:
-    page_width, page_height = A4
-    canvas = pdf_canvas.Canvas(buffer, pagesize=A4)
-
-    columns, rows = 2, 3
-    per_page = columns * rows
-    margin = 18 * mm
-    cell_width = (page_width - margin * 2) / columns
-    cell_height = (page_height - margin * 2) / rows
-    qr_size = min(cell_width, cell_height) - 26 * mm
-
-    for index, table in enumerate(tables):
-        if index and index % per_page == 0:
-            canvas.showPage()
-
-        slot = index % per_page
-        column, row = slot % columns, slot // columns
-        x = margin + column * cell_width + (cell_width - qr_size) / 2
-        y = page_height - margin - (row + 1) * cell_height + 20 * mm
-
-        canvas.drawInlineImage(_qr_image(table.qr_url), x, y, qr_size, qr_size)
-
-        canvas.setFont("Helvetica-Bold", 15)
-        canvas.drawCentredString(x + qr_size / 2, y - 9 * mm, f"{table.number}-stol")
-        canvas.setFont("Helvetica", 9)
-        canvas.drawCentredString(
-            x + qr_size / 2, y - 14 * mm, f"stolda.uz/{table.restaurant.slug}"
-        )
-
-    canvas.save()
 
 
 def _draw_restaurant_qr_page(buffer, restaurant, page_size) -> None:

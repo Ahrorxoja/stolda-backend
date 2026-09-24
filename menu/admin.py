@@ -5,26 +5,64 @@ from .models import (
     Dish,
     Invoice,
     MenuView,
-    PaymentMethod,
+    PaymentReceipt,
     Plan,
+    Profile,
     Restaurant,
     Subscription,
-    Table,
 )
 from .translations import translate
 
 
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "subscription_status", "is_active", "dish_count")
+    list_display = (
+        "name",
+        "slug",
+        "subscription_status",
+        "owner_contact",
+        "owner_telegram",
+        "is_active",
+        "dish_count",
+    )
     list_filter = ("is_active",)
-    search_fields = ("name", "slug", "phone")
+    search_fields = (
+        "name",
+        "slug",
+        "phone",
+        "owner__username",
+        "owner__profile__contact_phone",
+        "owner__profile__telegram",
+    )
     prepopulated_fields = {"slug": ("name",)}
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("owner__profile", "subscription")
 
     @admin.display(description="obuna")
     def subscription_status(self, obj: Restaurant) -> str:
         subscription = getattr(obj, "subscription", None)
         return subscription.get_status_display() if subscription else "—"
+
+    @admin.display(description="egasi bilan aloqa")
+    def owner_contact(self, obj: Restaurant) -> str:
+        profile = getattr(obj.owner, "profile", None)
+        phone = (profile.contact_phone if profile else "") or obj.phone
+        name = (profile.full_name if profile else "") or obj.owner.get_username()
+        return f"{name} · {phone}" if phone else name
+
+    @admin.display(description="telegram")
+    def owner_telegram(self, obj: Restaurant) -> str:
+        profile = getattr(obj.owner, "profile", None)
+        return (profile.telegram if profile else "") or "—"
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    """Hisob egalarining aloqa ma'lumotlari — to'lov kechikkanda kerak bo'ladi."""
+
+    list_display = ("user", "full_name", "contact_phone", "telegram", "updated_at")
+    search_fields = ("user__username", "full_name", "contact_phone", "telegram")
 
 
 @admin.register(Plan)
@@ -39,10 +77,11 @@ class SubscriptionAdmin(admin.ModelAdmin):
     search_fields = ("restaurant__name", "restaurant__slug")
 
 
-@admin.register(PaymentMethod)
-class PaymentMethodAdmin(admin.ModelAdmin):
-    list_display = ("restaurant", "provider", "brand", "last4", "is_default")
-    list_filter = ("provider",)
+@admin.register(PaymentReceipt)
+class PaymentReceiptAdmin(admin.ModelAdmin):
+    list_display = ("subscription", "amount", "period", "status", "created_at")
+    list_filter = ("status", "period")
+    date_hierarchy = "created_at"
 
 
 @admin.register(Invoice)
@@ -82,15 +121,8 @@ class DishAdmin(admin.ModelAdmin):
         return translate(obj.name)
 
 
-@admin.register(Table)
-class TableAdmin(admin.ModelAdmin):
-    list_display = ("number", "restaurant", "qr_token", "qr_url")
-    list_filter = ("restaurant",)
-    readonly_fields = ("qr_token",)
-
-
 @admin.register(MenuView)
 class MenuViewAdmin(admin.ModelAdmin):
-    list_display = ("created_at", "restaurant", "kind", "dish", "table")
+    list_display = ("created_at", "restaurant", "kind", "dish")
     list_filter = ("kind", "restaurant", "created_at")
     date_hierarchy = "created_at"

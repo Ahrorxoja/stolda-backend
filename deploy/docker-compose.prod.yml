@@ -43,11 +43,11 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID}
-      PAYME_KEY: ${PAYME_KEY}
-      CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
-      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
-      CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+      PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER}
+      PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER}
+      SITE_URL: ${SITE_URL:-https://stolda.uz}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
       MEDIA_ROOT: /srv/media
       STATIC_ROOT: /srv/static
     volumes:
@@ -78,11 +78,11 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/2
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
-      PAYME_MERCHANT_ID: ${PAYME_MERCHANT_ID}
-      PAYME_KEY: ${PAYME_KEY}
-      CLICK_SERVICE_ID: ${CLICK_SERVICE_ID}
-      CLICK_MERCHANT_ID: ${CLICK_MERCHANT_ID}
-      CLICK_SECRET_KEY: ${CLICK_SECRET_KEY}
+      PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER}
+      PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER}
+      SITE_URL: ${SITE_URL:-https://stolda.uz}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
       MEDIA_ROOT: /srv/media
     volumes:
       - media:/srv/media
@@ -106,6 +106,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # To'lov cheklarini tasdiqlash tugmalarini tinglaydi (long polling).
+  bot:
+    build:
+      context: ../
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: python manage.py telegram_bot
+    environment: *worker_env
+    volumes:
+      - media:/srv/media
+    depends_on:
+      db:
+        condition: service_healthy
 
   web:
     build:

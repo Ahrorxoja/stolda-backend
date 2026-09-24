@@ -1,10 +1,18 @@
 """Admin panel (JWT) uchun serializerlar."""
 
+import re
+
 from rest_framework import serializers
 
 from .images import to_webp
-from .models import Badge, Category, Dish, DishPhoto, Restaurant, Table
-from .phones import normalize_phone
+from .models import Badge, Category, Dish, DishPhoto, Profile, Restaurant
+from .permissions import is_member
+from .phones import (
+    MAX_EXTRA_PHONES,
+    clean_phone_list,
+    is_valid_phone,
+    normalize_phone,
+)
 from .serializers import ImageUrlMixin
 from .slugs import RESERVED_SLUGS, normalize_slug
 from .translations import (
@@ -86,8 +94,13 @@ class ManualHashMixin:
 class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
     cuisine = TranslatedField(required=False)
     address = TranslatedField(required=False)
-    hours = TranslatedField(required=False)
     languages = serializers.JSONField(required=False)
+    #: Bo'sh qatorlar formadan kelishi mumkin — ular `validate_extra_phones`
+    #: da tozalanadi, shuning uchun model tekshiruvi bu yerda ulanmaydi.
+    extra_phones = serializers.ListField(
+        child=serializers.CharField(allow_blank=True, max_length=32),
+        required=False,
+    )
     translation_meta = TranslationMetaField(required=False)
     logo = WebpImageField(required=False, allow_null=True, write_only=True)
     cover = WebpImageField(required=False, allow_null=True, write_only=True)
@@ -110,10 +123,13 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "auto_translate",
             "cuisine",
             "address",
-            "hours",
+            "working_hours",
             "phone",
+            "extra_phones",
             "city",
             "instagram",
+            "facebook",
+            "telegram",
             "logo",
             "cover",
             "logo_url",
@@ -141,7 +157,27 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
         return value
 
     def validate_phone(self, value: str) -> str:
-        return normalize_phone(value) if value else value
+        if not (value or "").strip():
+            return ""
+        if not is_valid_phone(value):
+            raise serializers.ValidationError(
+                "Telefon raqamini to'liq yozing, masalan +998 90 123 45 67."
+            )
+        return normalize_phone(value)
+
+    def validate_extra_phones(self, value) -> list[str]:
+        """Bo'sh qatorlar tushadi, raqamlar bir ko'rinishga keltiriladi."""
+        for item in value:
+            if (item or "").strip() and not is_valid_phone(item):
+                raise serializers.ValidationError(
+                    f"Telefon raqamini to'liq yozing: {item}"
+                )
+        cleaned = clean_phone_list(value)
+        if len(cleaned) > MAX_EXTRA_PHONES:
+            raise serializers.ValidationError(
+                f"Ko'pi bilan {MAX_EXTRA_PHONES} ta qo'shimcha raqam qo'shsa bo'ladi."
+            )
+        return cleaned
 
     def validate_slug(self, value: str) -> str:
         slug = normalize_slug(value)
@@ -160,6 +196,10 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"primary_language": "Asosiy til tanlangan tillar ichida bo'lishi kerak."}
             )
+        # Asosiy raqam qo'shimchalar orasida ikkinchi marta turmasin.
+        if "extra_phones" in attrs:
+            main = attrs.get("phone", getattr(self.instance, "phone", ""))
+            attrs["extra_phones"] = clean_phone_list(attrs["extra_phones"], main)
         return attrs
 
 
@@ -167,7 +207,10 @@ class CategoryAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelS
     name = TranslatedField()
     subtitle = TranslatedField(required=False)
     photo = WebpImageField(required=False, allow_null=True, write_only=True)
+    #: Kesilmagan nusxa — mijoz rasmni bosganda shu ochiladi.
+    photo_original = WebpImageField(required=False, allow_null=True, write_only=True)
     photo_url = serializers.SerializerMethodField()
+    photo_original_url = serializers.SerializerMethodField()
     dish_count = serializers.SerializerMethodField()
     translation_meta = TranslationMetaField(required=False)
 
@@ -180,7 +223,9 @@ class CategoryAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelS
             "subtitle",
             "icon",
             "photo",
+            "photo_original",
             "photo_url",
+            "photo_original_url",
             "position",
             "is_visible",
             "visible_from",
@@ -191,6 +236,9 @@ class CategoryAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelS
 
     def get_photo_url(self, obj: Category) -> str | None:
         return self._image_url(obj.photo)
+
+    def get_photo_original_url(self, obj: Category) -> str | None:
+        return self._image_url(obj.photo_original)
 
     def get_dish_count(self, obj: Category) -> int:
         return obj.dishes.count()
@@ -205,24 +253,29 @@ class CategoryAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelS
         return attrs
 
     def validate_restaurant(self, value: Restaurant) -> Restaurant:
-        if value.owner_id != self.context["request"].user.id:
+        if not is_member(value, self.context["request"].user):
             raise serializers.ValidationError("Bu restoran sizga tegishli emas.")
         return value
 
 
 class DishPhotoSerializer(ImageUrlMixin, serializers.ModelSerializer):
     image = WebpImageField(write_only=True)
+    original = WebpImageField(required=False, allow_null=True, write_only=True)
     url = serializers.SerializerMethodField()
+    original_url = serializers.SerializerMethodField()
 
     class Meta:
         model = DishPhoto
-        fields = ("id", "dish", "image", "url", "position")
+        fields = ("id", "dish", "image", "original", "url", "original_url", "position")
 
     def get_url(self, obj: DishPhoto) -> str | None:
         return self._image_url(obj.image)
 
+    def get_original_url(self, obj: DishPhoto) -> str | None:
+        return self._image_url(obj.original)
+
     def validate_dish(self, value: Dish) -> Dish:
-        if value.category.restaurant.owner_id != self.context["request"].user.id:
+        if not is_member(value.category.restaurant, self.context["request"].user):
             raise serializers.ValidationError("Bu taom sizga tegishli emas.")
         return value
 
@@ -233,7 +286,13 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
     ingredients = TranslatedListField(required=False)
     translation_meta = TranslationMetaField(required=False)
     photos = DishPhotoSerializer(many=True, read_only=True)
+    #: Asosiy rasmni bitta so'rovda almashtirish uchun. `photo` — menyuda
+    #: ko'rinadigan kesilgan nusxa, `photo_original` — mijoz bosganda
+    #: ochiladigan kesilmagan asl nusxa.
+    photo = WebpImageField(required=False, allow_null=True, write_only=True)
+    photo_original = WebpImageField(required=False, allow_null=True, write_only=True)
     photo_url = serializers.SerializerMethodField()
+    photo_original_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Dish
@@ -248,7 +307,10 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
             "unit",
             "kcal",
             "photos",
+            "photo",
+            "photo_original",
             "photo_url",
+            "photo_original_url",
             "badges",
             "is_available",
             "position",
@@ -258,8 +320,55 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
     def get_photo_url(self, obj: Dish) -> str | None:
         return self._image_url(obj.photo)
 
+    def get_photo_original_url(self, obj: Dish) -> str | None:
+        first = obj.photos.first()
+        return self._image_url(first.original) if first else None
+
+    def create(self, validated_data):
+        photo, original = self._pop_photo(validated_data)
+        dish = super().create(validated_data)
+        self._apply_photo(dish, photo, original)
+        return dish
+
+    def update(self, instance, validated_data):
+        photo, original = self._pop_photo(validated_data)
+        dish = super().update(instance, validated_data)
+        self._apply_photo(dish, photo, original)
+        return dish
+
+    @staticmethod
+    def _pop_photo(validated_data):
+        return validated_data.pop("photo", None), validated_data.pop("photo_original", None)
+
+    @staticmethod
+    def _apply_photo(dish: Dish, photo, original) -> None:
+        """Asosiy rasmni almashtiradi — `photo=null` bo'lsa o'chiradi.
+
+        Taomda bir nechta rasm bo'lishi mumkin; bu yerda faqat birinchisi
+        (menyuda ko'rinadigani) boshqariladi.
+        """
+        if photo is None:
+            return
+
+        first = dish.photos.first()
+        if photo is False or photo == "":
+            if first:
+                first.delete()
+            return
+
+        if first is None:
+            DishPhoto.objects.create(dish=dish, image=photo, original=original, position=0)
+            return
+
+        first.image = photo
+        fields = ["image"]
+        if original is not None:
+            first.original = original
+            fields.append("original")
+        first.save(update_fields=fields)
+
     def validate_category(self, value: Category) -> Category:
-        if value.restaurant.owner_id != self.context["request"].user.id:
+        if not is_member(value.restaurant, self.context["request"].user):
             raise serializers.ValidationError("Bu kategoriya sizga tegishli emas.")
         return value
 
@@ -286,20 +395,6 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
                     }
                 )
         return attrs
-
-
-class TableSerializer(serializers.ModelSerializer):
-    qr_url = serializers.CharField(read_only=True)
-
-    class Meta:
-        model = Table
-        fields = ("id", "restaurant", "number", "qr_token", "qr_url")
-        read_only_fields = ("qr_token",)
-
-    def validate_restaurant(self, value: Restaurant) -> Restaurant:
-        if value.owner_id != self.context["request"].user.id:
-            raise serializers.ValidationError("Bu restoran sizga tegishli emas.")
-        return value
 
 
 class TranslatePreviewSerializer(serializers.Serializer):
@@ -333,3 +428,39 @@ class PositionSerializer(serializers.Serializer):
 
     id = serializers.IntegerField()
     position = serializers.IntegerField(min_value=0)
+
+
+#: Telegram foydalanuvchi nomi: 5–32 ta harf, raqam yoki pastki chiziq.
+TELEGRAM_NAME = re.compile(r"[A-Za-z0-9_]{5,32}")
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """Hisob egasining aloqa ma'lumotlari — `/api/me/` orqali o'qiladi va yoziladi."""
+
+    class Meta:
+        model = Profile
+        fields = ("full_name", "contact_phone", "telegram")
+
+    def validate_contact_phone(self, value: str) -> str:
+        if not value.strip():
+            return ""
+        if not is_valid_phone(value):
+            raise serializers.ValidationError(
+                "Telefon raqamini to'liq yozing, masalan +998 90 123 45 67."
+            )
+        return normalize_phone(value)
+
+    def validate_telegram(self, value: str) -> str:
+        """`@nom`, `nom` yoki havola — hammasi `@nom` ko'rinishiga keladi."""
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        name = raw.removeprefix("https://").removeprefix("http://")
+        name = name.removeprefix("t.me/").removeprefix("telegram.me/").lstrip("@")
+        name = name.split("?")[0].strip("/")
+        if not TELEGRAM_NAME.fullmatch(name):
+            raise serializers.ValidationError(
+                "Telegram nomi 5–32 ta harf, raqam yoki pastki chiziqdan iborat "
+                "bo'lishi kerak, masalan @aziz_rahimov."
+            )
+        return f"@{name}"

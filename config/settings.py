@@ -24,6 +24,10 @@ SECRET_KEY = os.getenv(
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+#: Mijozga ko'rinadigan manzil — QR kod va taklif havolalari shundan yasaladi.
+#: Localda `.env` da `SITE_URL=http://localhost:3000` qilib qo'yiladi.
+SITE_URL = os.getenv("SITE_URL", "https://stolda.uz").strip().rstrip("/")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -109,6 +113,19 @@ REST_FRAMEWORK = {
     # `qr/?format=png` kabi o'z biznes parametrlarimiz bilan to'qnashib,
     # tanish renderer topilmasa 404 qaytaradi.
     "URL_FORMAT_OVERRIDE": None,
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
+    # Faqat `throttle_scope` belgilangan view'lar cheklanadi. Menyuni o'qish bu
+    # yerda yo'q — u keshdan keladi va mijozga hech qachon to'sqinlik qilmasin.
+    "DEFAULT_THROTTLE_RATES": {
+        # Anonim ko'rish hodisasi — bitta IP statistikani shishira olmasin.
+        "views": "120/hour",
+        # Parol tanlab ko'rishga qarshi.
+        "login": "10/min",
+        # Chek yuklash — soatiga bir nechtadan ortiq kerak emas.
+        "receipt": "10/hour",
+        # Ro'yxatdan o'tish va Google orqali kirish.
+        "signup": "20/hour",
+    },
 }
 
 from datetime import timedelta
@@ -164,13 +181,15 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 # bu yerda audience sifatida tekshiriladi.
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
-# To'lov provayderlari (Payme, Click). Kalitlar bo'lmasa `FakeProvider`
-# ishlatiladi — dev muhitida va testlarda tashqi so'rov yuborilmaydi.
-PAYME_MERCHANT_ID = os.getenv("PAYME_MERCHANT_ID", "")
-PAYME_KEY = os.getenv("PAYME_KEY", "")
-CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "")
-CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "")
-CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "")
+# To'lov qo'lda: restoran egasi shu kartaga pul o'tkazadi va chek yuklaydi.
+PAYMENT_CARD_NUMBER = os.getenv("PAYMENT_CARD_NUMBER", "")
+PAYMENT_CARD_HOLDER = os.getenv("PAYMENT_CARD_HOLDER", "")
+
+# Cheklar shu Telegram chatiga boradi va faqat shu chatdan tasdiqlanadi.
+# Token bo'lmasa `FakeBot` ishlatiladi — dev muhitida va testlarda tashqi
+# so'rov yuborilmaydi.
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_ADMIN_CHAT_ID = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
 
 # Yuklanadigan rasm hajmi chegarasi (8 MB).
 DATA_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024

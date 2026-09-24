@@ -7,6 +7,13 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def generate_qr_token() -> str:
+    """`Table` modeli bilan birga olib tashlangan — tarixiy migratsiya uchun."""
+    import secrets
+
+    return secrets.token_urlsafe(8)
+
+
 class Migration(migrations.Migration):
 
     initial = True
@@ -86,7 +93,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('number', models.CharField(max_length=16)),
-                ('qr_token', models.CharField(default=menu.models.generate_qr_token, editable=False, max_length=32, unique=True)),
+                ('qr_token', models.CharField(default=generate_qr_token, editable=False, max_length=32, unique=True)),
                 ('restaurant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tables', to='menu.restaurant')),
             ],
             options={

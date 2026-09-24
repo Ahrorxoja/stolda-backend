@@ -54,17 +54,19 @@ class PublicMenuView(APIView):
                 Prefetch("photos", queryset=DishPhoto.objects.all(), to_attr="gallery")
             )
         )
+        # Vaqt chegarasi kategoriyani yashirmaydi — menyu to'la ko'rinsin,
+        # mijoz esa nima qachon borligini belgidan biladi (`open_now`).
+        # Faqat egasi qo'lda yashirgani (`is_visible=False`) chiqmaydi.
         categories = [
             category
             for category in restaurant.categories.prefetch_related(
                 Prefetch("dishes", queryset=available, to_attr="available_dishes")
             )
-            # "Faqat belgilangan vaqtda" — Toshkent vaqti bo'yicha.
-            if category.is_open_at(now)
+            if category.is_visible
         ]
         dishes = [dish for category in categories for dish in category.available_dishes]
 
-        context = {"request": request}
+        context = {"request": request, "now": now}
         payload = {
             "restaurant": RestaurantSerializer(restaurant, context=context).data,
             "categories": CategorySerializer(categories, many=True, context=context).data,
@@ -90,7 +92,16 @@ class PublicMenuView(APIView):
             "active": False,
             "restaurant": {
                 field: full[field]
-                for field in ("name", "logo", "phone", "address", "instagram")
+                for field in (
+                    "name",
+                    "logo",
+                    "phone",
+                    "extra_phones",
+                    "address",
+                    "instagram",
+                    "facebook",
+                    "telegram",
+                )
             },
         }
         cache.set(key, payload, MENU_TTL_SECONDS)
@@ -116,6 +127,8 @@ class PublicViewEventView(APIView):
     """`POST /api/public/{slug}/views/` — QR skaner yoki taom ochilgani."""
 
     permission_classes = (AllowAny,)
+    #: Anonim va ochiq — bitta IP statistikani shishira olmasin.
+    throttle_scope = "views"
 
     def post(self, request, slug: str):
         restaurant = _get_restaurant(slug)

@@ -1,7 +1,7 @@
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from menu.models import MenuView, Table, ViewKind
+from menu.models import MenuView, ViewKind
 
 from .factories import make_category, make_dish, make_restaurant
 
@@ -89,19 +89,17 @@ class PublicViewEventTests(TestCase):
         self.restaurant = make_restaurant()
         self.category = make_category(self.restaurant)
         self.dish = make_dish(self.category)
-        self.table = Table.objects.create(restaurant=self.restaurant, number="3")
         self.url = reverse("public-views", args=[self.restaurant.slug])
 
     def post(self, payload):
         return self.client.post(self.url, payload, content_type="application/json")
 
-    def test_records_a_scan_with_its_table(self):
-        response = self.post({"kind": "scan", "table": self.table.qr_token})
+    def test_records_a_scan(self):
+        response = self.post({"kind": "scan"})
 
         self.assertEqual(response.status_code, 204)
         event = MenuView.objects.get()
         self.assertEqual(event.kind, ViewKind.SCAN)
-        self.assertEqual(event.table, self.table)
         self.assertIsNone(event.dish)
 
     def test_records_a_dish_open(self):
@@ -127,12 +125,6 @@ class PublicViewEventTests(TestCase):
 
     def test_unknown_kind_is_rejected(self):
         self.assertEqual(self.post({"kind": "order"}).status_code, 400)
-
-    def test_unknown_table_token_still_records_the_scan(self):
-        response = self.post({"kind": "scan", "table": "yoq-bunday-token"})
-
-        self.assertEqual(response.status_code, 204)
-        self.assertIsNone(MenuView.objects.get().table)
 
     def test_no_authentication_required(self):
         self.assertEqual(self.post({"kind": "scan"}).status_code, 204)

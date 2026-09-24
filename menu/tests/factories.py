@@ -33,7 +33,6 @@ def make_restaurant(**kwargs) -> Restaurant:
         "name": "Zamin",
         "cuisine": {"uz": "Milliy oshxona", "ru": "", "en": ""},
         "address": {"uz": "Toshkent", "ru": "", "en": ""},
-        "hours": {"uz": "10:00 – 23:00", "ru": "", "en": ""},
         "phone": "+998 90 123 45 67",
         "service_charge_percent": 20,
     }

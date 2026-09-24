@@ -1,7 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from menu.models import Table
 from menu.translations import translate, validate_translation, validate_translation_list
 
 from .factories import make_category, make_dish, make_plan, make_restaurant
@@ -78,19 +77,3 @@ class PlanLimitTests(TestCase):
         restaurant = make_restaurant(subscription_status=None)
         self.assertFalse(restaurant.can_add_dish())
         self.assertFalse(restaurant.limits["stats"])
-
-
-class TableTests(TestCase):
-    def test_qr_token_is_generated_and_unique(self):
-        restaurant = make_restaurant()
-        first = Table.objects.create(restaurant=restaurant, number="1")
-        second = Table.objects.create(restaurant=restaurant, number="2")
-
-        self.assertTrue(first.qr_token)
-        self.assertNotEqual(first.qr_token, second.qr_token)
-
-    def test_qr_url_points_at_the_restaurant_slug(self):
-        table = Table.objects.create(restaurant=make_restaurant(), number="7")
-        self.assertEqual(
-            table.qr_url, f"https://stolda.uz/zamin?t={table.qr_token}"
-        )

@@ -2,7 +2,9 @@
 
 from rest_framework import serializers
 
-from .models import Invoice, PaymentMethod, Plan, Subscription
+from .admin_serializers import WebpImageField
+from .models import Invoice, PaymentReceipt, Plan, Subscription
+from .serializers import ImageUrlMixin
 
 
 class PlanSerializer(serializers.ModelSerializer):
@@ -23,26 +25,32 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             "trial_ends_at",
             "current_period_end",
             "grace_ends_at",
-            "autopay",
-            "canceled_at",
         )
 
 
-class PaymentMethodSerializer(serializers.ModelSerializer):
+class PaymentReceiptSerializer(ImageUrlMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
-        model = PaymentMethod
+        model = PaymentReceipt
         fields = (
             "id",
-            "provider",
-            "brand",
-            "last4",
-            "exp_month",
-            "exp_year",
-            "is_default",
+            "image_url",
+            "amount",
+            "period",
+            "status",
+            "note",
+            "created_at",
+            "reviewed_at",
         )
 
+    def get_image_url(self, obj: PaymentReceipt) -> str | None:
+        return self._image_url(obj.image)
 
-class InvoiceSerializer(serializers.ModelSerializer):
+
+class InvoiceSerializer(ImageUrlMixin, serializers.ModelSerializer):
+    receipt_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Invoice
         fields = (
@@ -56,18 +64,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "receipt_url",
         )
 
+    def get_receipt_url(self, obj: Invoice) -> str | None:
+        return self._image_url(obj.receipt.image) if obj.receipt else None
 
-class SubscribeSerializer(serializers.Serializer):
-    plan = serializers.ChoiceField(choices=["standard"])
+
+class ReceiptUploadSerializer(serializers.Serializer):
+    """Chek yuklash — summa serverda hisoblanadi, mijozdan olinmaydi."""
+
     period = serializers.ChoiceField(choices=Subscription.Period.choices)
-    provider = serializers.ChoiceField(choices=PaymentMethod.Provider.choices)
-
-
-class CardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PaymentMethod
-        fields = ("provider", "token", "brand", "last4", "exp_month", "exp_year")
-
-
-class AutopaySerializer(serializers.Serializer):
-    autopay = serializers.BooleanField()
+    image = WebpImageField()
