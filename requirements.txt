@@ -9,5 +9,8 @@ gunicorn>=23.0
 qrcode[pil]>=8.0
 reportlab>=4.2
 celery>=5.4
+# Celery brokeri va Django keshi uchun — productionda Redis ishlatiladi.
+# Dev'da broker bo'sh bo'lgani uchun sezilmay qolgan edi.
+redis>=5.0
 requests>=2.32
 google-auth>=2.35
