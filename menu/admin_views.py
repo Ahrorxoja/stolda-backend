@@ -43,6 +43,7 @@ from .models import (
     ViewKind,
 )
 from .permissions import IsRestaurantMember, member_restaurant_ids
+from .serializers import absolute_media_url
 from .phones import normalize_phone
 from .slugs import RESERVED_SLUGS, normalize_slug
 from .tasks import retranslate_restaurant
@@ -456,7 +457,7 @@ class StatsView(APIView):
                 "name": translate(dish.name),
                 "icon": dish.category.icon,
                 "photo": (
-                    request.build_absolute_uri(dish.photo.url) if dish.photo else None
+                    absolute_media_url(dish.photo, request)
                 ),
                 "views": dish.view_count,
             }

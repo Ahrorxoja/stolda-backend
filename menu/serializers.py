@@ -4,17 +4,28 @@ Menyu bitta so'rovda uchala tilda ham qaytadi — tilni mijoz brauzerda
 almashtiradi, qayta so'rov yubormaydi.
 """
 
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import Category, Dish, MenuView, Restaurant, ViewKind
 
 
+def absolute_media_url(image, request=None) -> str | None:
+    """Rasmning to'liq havolasi — brauzer ochadigan manzil bilan.
+
+    `MEDIA_BASE_URL` berilgan bo'lsa (production) — o'sha domendan, aks holda
+    so'rov kelgan xostdan (dev: Django rasmlarni o'zi beradi).
+    """
+    if not image:
+        return None
+    if settings.MEDIA_BASE_URL:
+        return f"{settings.MEDIA_BASE_URL}/{image.url.lstrip('/')}"
+    return request.build_absolute_uri(image.url) if request else image.url
+
+
 class ImageUrlMixin:
     def _image_url(self, image) -> str | None:
-        if not image:
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(image.url) if request else image.url
+        return absolute_media_url(image, self.context.get("request"))
 
 
 class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):

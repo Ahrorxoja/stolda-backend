@@ -49,6 +49,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
       MEDIA_ROOT: /srv/media
+      # Rasm havolalari ochiq domendan — ichki `api:8000` dan emas.
+      MEDIA_BASE_URL: https://${DOMAIN}
       STATIC_ROOT: /srv/static
     volumes:
       - media:/srv/media

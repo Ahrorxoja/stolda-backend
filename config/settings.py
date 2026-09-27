@@ -98,6 +98,11 @@ STATIC_URL = "static/"
 STATIC_ROOT = Path(os.getenv("STATIC_ROOT", BASE_DIR / "staticfiles"))
 
 MEDIA_URL = "media/"
+#: Rasm havolalari shu manzildan yasaladi (`https://stolda.uz`). Bo'sh bo'lsa
+#: so'rov kelgan xostdan. Productionda shart: mijoz menyusini Next.js server
+#: tomonda ichki `http://api:8000` orqali oladi va xostdan yasalgan havola
+#: `http://api:8000/media/...` bo'lib qolardi — brauzer uni ocholmaydi.
+MEDIA_BASE_URL = os.getenv("MEDIA_BASE_URL", "").strip().rstrip("/")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
