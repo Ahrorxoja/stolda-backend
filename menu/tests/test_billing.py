@@ -455,7 +455,8 @@ class BillingApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["payment"], {"card_number": "8600 1234", "card_holder": "ISM"})
+        self.assertEqual(data["payment"]["card_number"], "8600 1234")
+        self.assertEqual(data["payment"]["card_holder"], "ISM")
         self.assertIsNone(data["pending_receipt"])
         self.assertTrue(any(plan["code"] == "standard" for plan in data["plans"]))
 

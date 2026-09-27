@@ -7,6 +7,7 @@ from .models import (
     MenuView,
     PaymentReceipt,
     Plan,
+    PlatformSettings,
     Profile,
     Restaurant,
     Subscription,
@@ -126,3 +127,34 @@ class MenuViewAdmin(admin.ModelAdmin):
     list_display = ("created_at", "restaurant", "kind", "dish")
     list_filter = ("kind", "restaurant", "created_at")
     date_hierarchy = "created_at"
+
+
+@admin.register(PlatformSettings)
+class PlatformSettingsAdmin(admin.ModelAdmin):
+    """Bitta yozuv: karta va yordam aloqalari. Qo'shish/o'chirish yopiq."""
+
+    list_display = ("card_number", "card_holder", "support_phone", "updated_at")
+    fieldsets = (
+        ("To'lov kartasi", {
+            "fields": ("card_number", "card_holder"),
+            "description": "Restoran egalari obuna uchun shu kartaga pul o'tkazadi.",
+        }),
+        ("Yordam aloqalari", {
+            "fields": ("support_phone", "support_telegram"),
+            "description": "To'lov sahifasida ko'rinadi — muammo chiqqanda murojaat uchun.",
+        }),
+    )
+
+    def has_add_permission(self, request) -> bool:
+        return not PlatformSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Ro'yxat o'rniga to'g'ridan-to'g'ri yagona yozuvni ochadi."""
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        obj = PlatformSettings.load()
+        return redirect(reverse("admin:menu_platformsettings_change", args=[obj.pk]))

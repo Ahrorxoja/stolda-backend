@@ -19,7 +19,14 @@ from .billing_serializers import (
     ReceiptUploadSerializer,
     SubscriptionSerializer,
 )
-from .models import Invoice, PaymentReceipt, Plan, Restaurant, RestaurantMember
+from .models import (
+    Invoice,
+    PaymentReceipt,
+    PlatformSettings,
+    Plan,
+    Restaurant,
+    RestaurantMember,
+)
 from .tasks import send_receipt_to_telegram
 
 
@@ -42,10 +49,19 @@ def _restaurant(request) -> Restaurant:
 
 
 def _payment_details() -> dict:
-    """Mijozga ko'rsatiladigan karta — `.env` dan."""
+    """Karta va yordam aloqalari — Django admindagi platforma sozlamalaridan.
+
+    Maydon bo'sh bo'lsa `.env` dagi qiymatga qaytadi, shunda eski
+    o'rnatmalar ham ishlayveradi.
+    """
+    platform = PlatformSettings.load()
     return {
-        "card_number": getattr(settings, "PAYMENT_CARD_NUMBER", ""),
-        "card_holder": getattr(settings, "PAYMENT_CARD_HOLDER", ""),
+        "card_number": platform.card_number
+        or getattr(settings, "PAYMENT_CARD_NUMBER", ""),
+        "card_holder": platform.card_holder
+        or getattr(settings, "PAYMENT_CARD_HOLDER", ""),
+        "support_phone": platform.support_phone,
+        "support_telegram": platform.support_telegram,
     }
 
 

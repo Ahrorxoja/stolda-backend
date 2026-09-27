@@ -42,6 +42,48 @@ class ViewKind(models.TextChoices):
     DISH_OPEN = "dish_open", "Taom ochildi"
 
 
+class PlatformSettings(models.Model):
+    """Platformaning o'z sozlamalari — bitta yozuv, Django admin orqali.
+
+    Karta raqami va yordam aloqalari `.env` da turganda har o'zgarishda
+    serverni qayta ishga tushirish kerak edi. Endi ular bazada: admin
+    panelidan o'zgartirilgan zahoti to'lov sahifasida ko'rinadi.
+
+    Bo'sh qoldirilgan maydon uchun `.env` dagi qiymat ishlatiladi —
+    shuning uchun eski sozlama ham buzilmaydi.
+    """
+
+    card_number = models.CharField("Karta raqami", max_length=32, blank=True)
+    card_holder = models.CharField("Karta egasi", max_length=120, blank=True)
+    #: To'lovda muammo chiqqan restoran egasi shu yerga murojaat qiladi.
+    support_phone = models.CharField("Yordam telefoni", max_length=32, blank=True)
+    support_telegram = models.CharField("Yordam Telegrami", max_length=120, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Platforma sozlamalari"
+        verbose_name_plural = "Platforma sozlamalari"
+
+    def __str__(self) -> str:
+        return "Platforma sozlamalari"
+
+    def save(self, *args, **kwargs):
+        # Yozuv doim bitta bo'lsin. `objects.create()` `force_insert` bilan
+        # keladi — ikkinchi chaqiruvda u baza xatosiga olib kelardi, shuning
+        # uchun olib tashlanadi va mavjud yozuv yangilanadi.
+        self.pk = 1
+        kwargs.pop("force_insert", None)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # pragma: no cover — adminda taqiqlangan
+        pass
+
+    @classmethod
+    def load(cls) -> "PlatformSettings":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class Profile(models.Model):
     """Hisob egasining aloqa ma'lumotlari.
 
