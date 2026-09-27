@@ -161,7 +161,8 @@ services:
     volumes:
       - certbot-conf:/etc/letsencrypt
       - certbot-www:/var/www/certbot
-    # Har 12 soatda yangilashga urinadi; nginx'ni deploy.sh qayta yuklaydi.
+    # Har 12 soatda yangilashga urinadi. Yangi sertifikatni nginx qayta
+    # yuklanganda oladi — buni har kuni 04:30 da cron qiladi (DEPLOY.md, 6).
     entrypoint: >
       sh -c "trap exit TERM;
              while :; do certbot renew --webroot -w /var/www/certbot --quiet;
