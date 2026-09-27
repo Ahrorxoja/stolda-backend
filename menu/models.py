@@ -160,6 +160,10 @@ class Restaurant(models.Model):
     logo = models.ImageField(upload_to="restaurants/logos/", null=True, blank=True)
     cover = models.ImageField(upload_to="restaurants/covers/", null=True, blank=True)
     service_charge_percent = models.PositiveSmallIntegerField(default=0)
+    #: QR nuqtalarining rangi — oq fonga nisbatan yetarlicha to'q (`menu/qr.py`).
+    qr_color = models.CharField("QR rangi", max_length=7, default="#231c17")
+    #: QR o'rtasiga restoran logotipi qo'yilsinmi.
+    qr_logo = models.BooleanField("QR'da logotip", default=False)
     is_active = models.BooleanField(default=True)
     #: O'chirilsa menyu ochiladi, lekin Google/Yandex'ga ko'rsatilmaydi
     #: (`noindex`, sitemap'da yo'q) — masalan namuna (demo) restoran uchun.

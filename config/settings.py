@@ -220,3 +220,6 @@ if not DEBUG:
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 )
+#: QR oldindan ko'rishida logotip haqiqatan qo'yilganini brauzer o'qiy olsin
+#: (localda frontend boshqa portda — sarlavha ochiq e'lon qilinmasa ko'rinmaydi).
+CORS_EXPOSE_HEADERS = ["X-QR-Logo"]

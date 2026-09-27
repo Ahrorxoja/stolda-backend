@@ -4,6 +4,7 @@ import re
 
 from rest_framework import serializers
 
+from . import qr as qr_codes
 from .images import to_webp
 from .models import Badge, Category, Dish, DishPhoto, Profile, Restaurant
 from .permissions import is_member
@@ -135,6 +136,8 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "logo_url",
             "cover_url",
             "service_charge_percent",
+            "qr_color",
+            "qr_logo",
             "plan",
             "is_active",
             "translation_meta",
@@ -179,6 +182,12 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             )
         return cleaned
 
+    def validate_qr_color(self, value: str) -> str:
+        try:
+            return qr_codes.normalize_color(value)
+        except qr_codes.QrColorError as error:
+            raise serializers.ValidationError(str(error)) from error
+
     def validate_slug(self, value: str) -> str:
         slug = normalize_slug(value)
         if not slug:
@@ -200,6 +209,12 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
         if "extra_phones" in attrs:
             main = attrs.get("phone", getattr(self.instance, "phone", ""))
             attrs["extra_phones"] = clean_phone_list(attrs["extra_phones"], main)
+        if attrs.get("qr_logo"):
+            logo = attrs["logo"] if "logo" in attrs else getattr(self.instance, "logo", None)
+            if not logo:
+                raise serializers.ValidationError(
+                    {"qr_logo": "Avval Sozlamalarda restoran logotipini yuklang."}
+                )
         return attrs
 
 

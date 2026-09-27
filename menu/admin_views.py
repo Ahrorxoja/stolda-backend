@@ -3,11 +3,10 @@
 import io
 from datetime import timedelta
 
-import qrcode
 from django.db import transaction
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
-from django.http import FileResponse, HttpResponse
+from django.http import HttpResponse
 from django.utils import timezone
 from reportlab.lib.pagesizes import A4, A6
 from reportlab.lib.units import mm
@@ -42,6 +41,7 @@ from .models import (
     Subscription,
     ViewKind,
 )
+from . import qr as qr_codes
 from .deletion import delete_restaurant, deletion_summary
 from .permissions import IsRestaurantMember, is_owner, member_restaurant_ids
 from .serializers import absolute_media_url
@@ -170,30 +170,44 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def qr(self, request, pk=None):
-        """`?format=png|a6|a4` — restoranning yagona QR kodi."""
+        """`?format=png|a6|a4` — restoranning yagona QR kodi.
+
+        Oldindan ko'rish uchun (saqlamasdan): `color=%23RRGGBB`, `logo=0|1`,
+        `inline=1`. `X-QR-Logo` sarlavhasi logotip haqiqatan qo'yilganini
+        bildiradi — QR logotip bilan o'qilmasa, logotipsiz beriladi.
+        """
         restaurant = self.get_object()
         fmt = request.query_params.get("format", "png")
+        if fmt not in ("png", "a6", "a4"):
+            raise ValidationError({"format": "format `png`, `a6` yoki `a4` bo'lishi kerak."})
 
+        color = request.query_params.get("color")
+        if color:
+            try:
+                color = qr_codes.normalize_color(color)
+            except qr_codes.QrColorError as error:
+                raise ValidationError({"color": str(error)}) from error
+        logo_param = request.query_params.get("logo")
+        logo = None if logo_param is None else logo_param in ("1", "true")
+        inline = request.query_params.get("inline") in ("1", "true")
+
+        image, logo_used = qr_codes.restaurant_qr(restaurant, color=color, logo=logo)
+        buffer = io.BytesIO()
         if fmt == "png":
-            buffer = io.BytesIO()
-            _qr_image(restaurant.qr_url).save(buffer, format="PNG")
-            buffer.seek(0)
-            return FileResponse(
-                buffer,
-                content_type="image/png",
-                as_attachment=True,
-                filename=f"{restaurant.slug}-qr.png",
+            image.save(buffer, format="PNG")
+            response = HttpResponse(buffer.getvalue(), content_type="image/png")
+            filename = f"{restaurant.slug}-qr.png"
+        else:
+            _draw_restaurant_qr_page(
+                buffer, restaurant, image, page_size=A6 if fmt == "a6" else A4
             )
+            response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+            filename = f"{restaurant.slug}-qr-{fmt}.pdf"
 
-        if fmt in ("a6", "a4"):
-            buffer = io.BytesIO()
-            _draw_restaurant_qr_page(buffer, restaurant, page_size=A6 if fmt == "a6" else A4)
-            buffer.seek(0)
-            response = HttpResponse(buffer.read(), content_type="application/pdf")
-            response["Content-Disposition"] = f'attachment; filename="{restaurant.slug}-qr-{fmt}.pdf"'
-            return response
-
-        raise ValidationError({"format": "format `png`, `a6` yoki `a4` bo'lishi kerak."})
+        disposition = "inline" if inline else "attachment"
+        response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+        response["X-QR-Logo"] = "1" if logo_used else "0"
+        return response
 
 
 class CategoryViewSet(OwnerScopedViewSet):
@@ -530,14 +544,7 @@ def _change(current: int, previous: int) -> float | None:
     return round((current - previous) / previous * 100, 1)
 
 
-def _qr_image(url: str):
-    qr = qrcode.QRCode(box_size=10, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
-    qr.add_data(url)
-    qr.make(fit=True)
-    return qr.make_image(fill_color="#231C17", back_color="#FFFCF8").convert("RGB")
-
-
-def _draw_restaurant_qr_page(buffer, restaurant, page_size) -> None:
+def _draw_restaurant_qr_page(buffer, restaurant, image, page_size) -> None:
     """Butun restoran uchun bitta QR — chop etishga tayyor bir varaq."""
     page_width, page_height = page_size
     canvas = pdf_canvas.Canvas(buffer, pagesize=page_size)
@@ -547,7 +554,7 @@ def _draw_restaurant_qr_page(buffer, restaurant, page_size) -> None:
     x = (page_width - qr_size) / 2
     y = page_height - margin - qr_size
 
-    canvas.drawInlineImage(_qr_image(restaurant.qr_url), x, y, qr_size, qr_size)
+    canvas.drawInlineImage(image, x, y, qr_size, qr_size)
 
     canvas.setFont("Helvetica-Bold", 16)
     canvas.drawCentredString(page_width / 2, y - 10 * mm, restaurant.name)
