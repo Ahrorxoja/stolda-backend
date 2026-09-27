@@ -173,8 +173,9 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         """`?format=png|a6|a4` — restoranning yagona QR kodi.
 
         Oldindan ko'rish uchun (saqlamasdan): `color=%23RRGGBB`, `logo=0|1`,
-        `inline=1`. `X-QR-Logo` sarlavhasi logotip haqiqatan qo'yilganini
-        bildiradi — QR logotip bilan o'qilmasa, logotipsiz beriladi.
+        `style=square|rounded|dots|gapped`, `eyes=square|rounded`, `inline=1`.
+        `X-QR-Logo` va `X-QR-Style` sarlavhalari haqiqatan nima chizilganini
+        bildiradi — tanlangan dizayn o'qilmasa, soddarog'i beriladi.
         """
         restaurant = self.get_object()
         fmt = request.query_params.get("format", "png")
@@ -189,9 +190,18 @@ class RestaurantViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"color": str(error)}) from error
         logo_param = request.query_params.get("logo")
         logo = None if logo_param is None else logo_param in ("1", "true")
+        style = request.query_params.get("style") or None
+        if style and style not in qr_codes.STYLES:
+            raise ValidationError({"style": "Noma'lum QR turi."})
+        eyes = request.query_params.get("eyes") or None
+        if eyes and eyes not in qr_codes.EYES:
+            raise ValidationError({"eyes": "Noma'lum burchak turi."})
         inline = request.query_params.get("inline") in ("1", "true")
 
-        image, logo_used = qr_codes.restaurant_qr(restaurant, color=color, logo=logo)
+        rendered = qr_codes.restaurant_qr(
+            restaurant, color=color, logo=logo, style=style, eyes=eyes
+        )
+        image = rendered.image
         buffer = io.BytesIO()
         if fmt == "png":
             image.save(buffer, format="PNG")
@@ -206,7 +216,8 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
         disposition = "inline" if inline else "attachment"
         response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
-        response["X-QR-Logo"] = "1" if logo_used else "0"
+        response["X-QR-Logo"] = "1" if rendered.logo else "0"
+        response["X-QR-Style"] = f"{rendered.style}:{rendered.eyes}"
         return response
 
 

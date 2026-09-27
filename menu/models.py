@@ -12,6 +12,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from . import qr as qr_codes
 from .hours import default_working_hours, validate_working_hours
 from .phones import validate_phone_list
 from .translations import (
@@ -164,6 +165,13 @@ class Restaurant(models.Model):
     qr_color = models.CharField("QR rangi", max_length=7, default="#231c17")
     #: QR o'rtasiga restoran logotipi qo'yilsinmi.
     qr_logo = models.BooleanField("QR'da logotip", default=False)
+    #: Nuqta shakli va burchak kvadratlari — `menu/qr.py` dagi ro'yxatlardan.
+    qr_style = models.CharField(
+        "QR nuqta shakli", max_length=16, choices=qr_codes.STYLE_CHOICES, default="square"
+    )
+    qr_eyes = models.CharField(
+        "QR burchaklari", max_length=16, choices=qr_codes.EYE_CHOICES, default="square"
+    )
     is_active = models.BooleanField(default=True)
     #: O'chirilsa menyu ochiladi, lekin Google/Yandex'ga ko'rsatilmaydi
     #: (`noindex`, sitemap'da yo'q) — masalan namuna (demo) restoran uchun.

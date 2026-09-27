@@ -9,17 +9,29 @@ Qoidalar (aks holda telefon QR'ni o'qimay qolishi mumkin):
 * Logotip qo'yilsa, QR eng yuqori tuzatish darajasida (H, ~30% qismi yopilsa
   ham o'qiladi) yasaladi, logotip esa tomonning `LOGO_SHARE` qismidan
   oshmaydi. Burchakdagi uchta katta kvadratga tegmaydi.
-* Har bir tayyor rasm `zxing-cpp` bilan qayta o'qib ko'riladi. Logotip bilan
-  o'qilmasa, logotipsiz variant beriladi — ishlamaydigan QR hech qachon
-  chiqmaydi.
+* Nuqta shakli (`STYLES`) va burchak kvadratlari (`EYES`) faqat sinab
+  ko'rilgan, ishonchli turlardan tanlanadi. Burchak kvadratlarining
+  tuzilishi (7-5-3 modul) o'zgarmaydi — faqat burchaklari silliqlanadi.
+* Har bir tayyor rasm `zxing-cpp` bilan qayta o'qib ko'riladi. O'qilmasa
+  avval logotipsiz, keyin klassik turda beriladi — ishlamaydigan QR hech
+  qachon chiqmaydi.
 """
 
 import logging
 import re
+from dataclasses import dataclass
 
 import qrcode
 import zxingcpp
 from PIL import Image, ImageDraw, ImageOps
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.colormasks import SolidFillColorMask
+from qrcode.image.styles.moduledrawers.pil import (
+    CircleModuleDrawer,
+    GappedSquareModuleDrawer,
+    RoundedModuleDrawer,
+    SquareModuleDrawer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +43,23 @@ MIN_CONTRAST = 4.0
 LOGO_SHARE = 0.28
 
 HEX = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+#: Nuqta shakli: kalit → (nomi, chizuvchi).
+STYLES = {
+    "square": ("Klassik", SquareModuleDrawer),
+    "rounded": ("Yumaloq", RoundedModuleDrawer),
+    "dots": ("Nuqtali", CircleModuleDrawer),
+    "gapped": ("Kichik kvadratlar", GappedSquareModuleDrawer),
+}
+#: Burchakdagi uchta katta kvadrat.
+EYES = {
+    "square": ("Kvadrat", SquareModuleDrawer),
+    "rounded": ("Yumaloq", RoundedModuleDrawer),
+}
+STYLE_CHOICES = [(key, name) for key, (name, _) in STYLES.items()]
+EYE_CHOICES = [(key, name) for key, (name, _) in EYES.items()]
+DEFAULT_STYLE = "square"
+DEFAULT_EYES = "square"
 
 
 class QrColorError(ValueError):
@@ -93,18 +122,35 @@ def _logo_badge(logo_file, side: int) -> Image.Image | None:
     return badge
 
 
-def render(url: str, color: str = DEFAULT_COLOR, logo_file=None, box_size: int = 12) -> Image.Image:
+def _rgb(color: str) -> tuple[int, int, int]:
+    return tuple(int(color[i : i + 2], 16) for i in (1, 3, 5))
+
+
+def render(
+    url: str,
+    color: str = DEFAULT_COLOR,
+    logo_file=None,
+    box_size: int = 12,
+    style: str = DEFAULT_STYLE,
+    eyes: str = DEFAULT_EYES,
+) -> Image.Image:
     """QR rasmi (RGB). `logo_file` — `ImageField` fayli yoki `None`."""
-    qr = qrcode.QRCode(
-        box_size=box_size,
-        border=2,
-        error_correction=(
-            qrcode.constants.ERROR_CORRECT_H if logo_file else qrcode.constants.ERROR_CORRECT_M
-        ),
-    )
+    if logo_file:
+        correction = qrcode.constants.ERROR_CORRECT_H
+    elif style in ("dots", "gapped"):
+        # Nuqtalar modulni to'liq to'ldirmaydi — tuzatish zaxirasi kattaroq bo'lsin.
+        correction = qrcode.constants.ERROR_CORRECT_Q
+    else:
+        correction = qrcode.constants.ERROR_CORRECT_M
+    qr = qrcode.QRCode(box_size=box_size, border=2, error_correction=correction)
     qr.add_data(url)
     qr.make(fit=True)
-    image = qr.make_image(fill_color=color, back_color=BACKGROUND).convert("RGBA")
+    image = qr.make_image(
+        image_factory=StyledPilImage,
+        module_drawer=STYLES.get(style, STYLES[DEFAULT_STYLE])[1](),
+        eye_drawer=EYES.get(eyes, EYES[DEFAULT_EYES])[1](),
+        color_mask=SolidFillColorMask(back_color=_rgb(BACKGROUND), front_color=_rgb(color)),
+    ).convert("RGBA")
 
     if logo_file:
         code_side = qr.modules_count * box_size
@@ -127,22 +173,54 @@ def decodes_to(image: Image.Image, url: str) -> bool:
     return any(result.text == url for result in results)
 
 
+@dataclass
+class RenderedQr:
+    image: Image.Image
+    #: Logotip haqiqatan qo'yildimi.
+    logo: bool
+    #: Qaysi nuqta shakli ishlatildi — o'qilmagan bo'lsa `square` ga qaytadi.
+    style: str
+    eyes: str
+
+
 def restaurant_qr(
-    restaurant, color: str | None = None, logo: bool | None = None, box_size: int = 12
-) -> tuple[Image.Image, bool]:
+    restaurant,
+    color: str | None = None,
+    logo: bool | None = None,
+    style: str | None = None,
+    eyes: str | None = None,
+    box_size: int = 12,
+) -> RenderedQr:
     """Restoran sozlamalari (yoki oldindan ko'rish uchun berilgan qiymatlar) bilan QR.
 
-    Qaytaradi: `(rasm, logotip_qo'yildimi)`. Logotip QR'ni o'qib bo'lmaydigan
-    qilsa yoki logotip yuklanmagan bo'lsa — logotipsiz rasm.
+    Tanlangan dizayn o'qilmasa, soddaroq variantlar ketma-ket sinab ko'riladi:
+    logotipsiz, keyin klassik kvadrat. Oxirgisi har doim o'qiladi.
     """
     url = restaurant.qr_url
     color = color or restaurant.qr_color or DEFAULT_COLOR
     want_logo = restaurant.qr_logo if logo is None else logo
+    style = style or restaurant.qr_style or DEFAULT_STYLE
+    eyes = eyes or restaurant.qr_eyes or DEFAULT_EYES
+    logo_file = restaurant.logo if want_logo and restaurant.logo else None
 
-    if want_logo and restaurant.logo:
-        image = render(url, color, restaurant.logo, box_size)
+    attempts = [(style, eyes, logo_file)]
+    if logo_file:
+        attempts.append((style, eyes, None))
+    if (style, eyes) != (DEFAULT_STYLE, DEFAULT_EYES):
+        attempts.append((DEFAULT_STYLE, DEFAULT_EYES, None))
+
+    for attempt_style, attempt_eyes, attempt_logo in attempts:
+        image = render(url, color, attempt_logo, box_size, attempt_style, attempt_eyes)
         if decodes_to(image, url):
-            return image, True
-        logger.warning("Logotipli QR o'qilmadi, logotipsiz beriladi: %s", restaurant.slug)
+            return RenderedQr(image, bool(attempt_logo), attempt_style, attempt_eyes)
+        logger.warning(
+            "QR o'qilmadi (%s, %s, logo=%s): %s",
+            attempt_style,
+            attempt_eyes,
+            bool(attempt_logo),
+            restaurant.slug,
+        )
 
-    return render(url, color, None, box_size), False
+    # Klassik qora-oq QR — kutubxona xatosi bo'lmasa bu yerga yetib kelinmaydi.
+    image = render(url, DEFAULT_COLOR, None, box_size)
+    return RenderedQr(image, False, DEFAULT_STYLE, DEFAULT_EYES)

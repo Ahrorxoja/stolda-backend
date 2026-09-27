@@ -222,4 +222,4 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 #: QR oldindan ko'rishida logotip haqiqatan qo'yilganini brauzer o'qiy olsin
 #: (localda frontend boshqa portda — sarlavha ochiq e'lon qilinmasa ko'rinmaydi).
-CORS_EXPOSE_HEADERS = ["X-QR-Logo"]
+CORS_EXPOSE_HEADERS = ["X-QR-Logo", "X-QR-Style"]

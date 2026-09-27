@@ -138,6 +138,8 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "service_charge_percent",
             "qr_color",
             "qr_logo",
+            "qr_style",
+            "qr_eyes",
             "plan",
             "is_active",
             "translation_meta",

@@ -136,3 +136,65 @@ class QrStyleApiTests(TestCase):
 
         self.assertEqual(png["X-QR-Logo"], "0")
         self.assertEqual(decoded(png.content), [self.restaurant.qr_url])
+
+
+@override_settings(MEDIA_ROOT=MEDIA)
+class QrShapeTests(TestCase):
+    def setUp(self):
+        self.restaurant = make_restaurant()
+        self.client = APIClient()
+        self.client.force_authenticate(self.restaurant.owner)
+        self.url = f"/api/restaurants/{self.restaurant.pk}/"
+
+    def test_every_shape_and_corner_combination_scans(self):
+        self.client.patch(self.url, {"logo": logo_file()}, format="multipart")
+        for style in qr.STYLES:
+            for eyes in qr.EYES:
+                for logo in (0, 1):
+                    with self.subTest(style=style, eyes=eyes, logo=logo):
+                        response = self.client.get(
+                            f"{self.url}qr/?format=png&style={style}&eyes={eyes}&logo={logo}"
+                        )
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response["X-QR-Style"], f"{style}:{eyes}")
+                        self.assertEqual(response["X-QR-Logo"], str(logo))
+                        self.assertEqual(decoded(response.content), [self.restaurant.qr_url])
+
+    def test_shape_is_saved_and_used_for_downloads(self):
+        response = self.client.patch(
+            self.url, {"qr_style": "dots", "qr_eyes": "rounded"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual((response.data["qr_style"], response.data["qr_eyes"]), ("dots", "rounded"))
+        png = self.client.get(f"{self.url}qr/?format=png")
+        self.assertEqual(png["X-QR-Style"], "dots:rounded")
+
+    def test_unknown_shapes_are_rejected(self):
+        self.assertEqual(
+            self.client.patch(self.url, {"qr_style": "stars"}, format="json").status_code, 400
+        )
+        self.assertEqual(
+            self.client.patch(self.url, {"qr_eyes": "hearts"}, format="json").status_code, 400
+        )
+        self.assertEqual(self.client.get(f"{self.url}qr/?format=png&style=stars").status_code, 400)
+        self.assertEqual(self.client.get(f"{self.url}qr/?format=png&eyes=x").status_code, 400)
+
+    def test_unreadable_shape_falls_back_to_classic(self):
+        Restaurant.objects.filter(pk=self.restaurant.pk).update(qr_style="dots")
+        real = qr.decodes_to
+        attempts = []
+
+        def fail_first(image, url):
+            # Birinchi urinish (nuqtali) "o'qilmadi", keyingisi haqiqiy tekshiruv.
+            attempts.append(image)
+            return len(attempts) > 1 and real(image, url)
+
+        qr.decodes_to = fail_first
+        try:
+            png = self.client.get(f"{self.url}qr/?format=png")
+        finally:
+            qr.decodes_to = real
+
+        self.assertEqual(png["X-QR-Style"], "square:square")
+        self.assertEqual(decoded(png.content), [self.restaurant.qr_url])
