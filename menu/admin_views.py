@@ -42,7 +42,8 @@ from .models import (
     Subscription,
     ViewKind,
 )
-from .permissions import IsRestaurantMember, member_restaurant_ids
+from .deletion import delete_restaurant, deletion_summary
+from .permissions import IsRestaurantMember, is_owner, member_restaurant_ids
 from .serializers import absolute_media_url
 from .phones import normalize_phone
 from .slugs import RESERVED_SLUGS, normalize_slug
@@ -119,6 +120,30 @@ class RestaurantViewSet(viewsets.ModelViewSet):
                 status=Subscription.Status.TRIALING,
                 trial_ends_at=now + timedelta(days=self.TRIAL_DAYS),
             )
+
+    def destroy(self, request, *args, **kwargs):
+        """Restoranni butunlay o'chiradi — faqat egasi, nomini tasdiqlab.
+
+        `confirm` — restoran manzili (slug). Panel ikki bosqichli ogohlantirish
+        ko'rsatadi, server esa tasodifiy yoki begona so'rovdan himoya qiladi.
+        """
+        restaurant = self.get_object()
+        if not is_owner(restaurant, request.user):
+            raise PermissionDenied("Restoranni faqat egasi o'chira oladi.")
+        if str(request.data.get("confirm", "")).strip().lower() != restaurant.slug:
+            raise ValidationError(
+                {"confirm": "Tasdiqlash uchun restoran manzilini aynan yozing."}
+            )
+        delete_restaurant(restaurant)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def deletion(self, request, pk=None):
+        """O'chirishdan oldingi ogohlantirish uchun: nima yo'qolishi."""
+        restaurant = self.get_object()
+        if not is_owner(restaurant, request.user):
+            raise PermissionDenied("Restoranni faqat egasi o'chira oladi.")
+        return Response(deletion_summary(restaurant))
 
     def perform_update(self, serializer):
         before = set(serializer.instance.languages or [])
