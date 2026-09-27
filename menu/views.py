@@ -138,3 +138,37 @@ class PublicViewEventView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PublicSitemapView(APIView):
+    """`GET /api/public/sitemap/` — qidiruv tizimlariga ko'rsatiladigan menyular.
+
+    Faqat haqiqatan ochiladigan va bo'sh bo'lmagan menyular: restoran faol,
+    obunasi to'xtatilmagan va kamida bitta ko'rinadigan taomi bor. Bo'sh yoki
+    yopiq menyuni indekslatish qidiruvda "yupqa sahifa" bo'lib zarar qiladi.
+    """
+
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+
+    def get(self, request):
+        restaurants = (
+            Restaurant.objects.filter(
+                is_active=True,
+                categories__is_visible=True,
+                categories__dishes__is_available=True,
+            )
+            .exclude(subscription__status=Subscription.Status.SUSPENDED)
+            .distinct()
+            .order_by("slug")
+        )
+        return Response(
+            [
+                {
+                    "slug": restaurant.slug,
+                    "languages": restaurant.languages or [restaurant.primary_language],
+                    "primary_language": restaurant.primary_language,
+                }
+                for restaurant in restaurants
+            ]
+        )

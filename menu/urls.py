@@ -20,7 +20,7 @@ from .member_views import (
     MemberDetailView,
     MemberListView,
 )
-from .views import PublicMenuView, PublicViewEventView
+from .views import PublicMenuView, PublicSitemapView, PublicViewEventView
 
 router = DefaultRouter()
 router.register("restaurants", RestaurantViewSet, basename="restaurant")
@@ -30,6 +30,7 @@ router.register("dish-photos", DishPhotoViewSet, basename="dish-photo")
 
 urlpatterns = [
     # Public — QR skanerlagan mijoz uchun
+    path("public/sitemap/", PublicSitemapView.as_view(), name="public-sitemap"),
     path("public/<slug:slug>/menu/", PublicMenuView.as_view(), name="public-menu"),
     path("public/<slug:slug>/views/", PublicViewEventView.as_view(), name="public-views"),
     # Admin — JWT

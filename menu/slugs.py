@@ -5,7 +5,12 @@ from django.utils.text import slugify
 from .models import Restaurant
 
 #: Next.js'dagi tub yo'llar bilan to'qnashmasligi uchun taqiqlangan manzillar.
-RESERVED_SLUGS = {"admin", "api", "app", "dev", "media", "signup", "static", "www"}
+RESERVED_SLUGS = {
+    "admin", "api", "app", "dev", "media", "signup", "static", "www",
+    # Landing'ning til sahifalari (`/ru`, `/en`) va xizmat yo'llari —
+    # restoran shu manzilni olsa, uning menyusi ochilmay qolardi.
+    "uz", "ru", "en", "join", "sitemap", "robots", "brand", "icon", "django-admin",
+}
 
 
 def normalize_slug(value: str) -> str:
