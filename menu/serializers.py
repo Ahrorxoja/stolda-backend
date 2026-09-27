@@ -39,6 +39,7 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "logo",
             "cover",
             "service_charge_percent",
+            "is_listed",
         )
 
     def get_logo(self, obj: Restaurant) -> str | None:

@@ -58,6 +58,15 @@ class PublicSitemapTests(TestCase):
 
         self.assertEqual(self.slugs(), [])
 
+    def test_unlisted_restaurant_is_not_listed(self):
+        """Demo restoran: menyu ochiladi, lekin qidiruvga chiqmaydi."""
+        restaurant = make_restaurant(is_listed=False)
+        make_dish(make_category(restaurant))
+
+        self.assertEqual(self.slugs(), [])
+        menu = self.client.get(reverse("public-menu", args=[restaurant.slug])).json()
+        self.assertFalse(menu["restaurant"]["is_listed"])
+
     def test_each_restaurant_appears_once(self):
         restaurant = make_restaurant()
         for _ in range(3):

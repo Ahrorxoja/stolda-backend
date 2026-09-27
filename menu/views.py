@@ -155,6 +155,7 @@ class PublicSitemapView(APIView):
         restaurants = (
             Restaurant.objects.filter(
                 is_active=True,
+                is_listed=True,
                 categories__is_visible=True,
                 categories__dishes__is_available=True,
             )

@@ -161,6 +161,9 @@ class Restaurant(models.Model):
     cover = models.ImageField(upload_to="restaurants/covers/", null=True, blank=True)
     service_charge_percent = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    #: O'chirilsa menyu ochiladi, lekin Google/Yandex'ga ko'rsatilmaydi
+    #: (`noindex`, sitemap'da yo'q) — masalan namuna (demo) restoran uchun.
+    is_listed = models.BooleanField("Qidiruvda ko'rinsin", default=True)
     #: 14 kunlik sinov bir marta beriladi — shu maydon shuni belgilaydi.
     trial_used_at = models.DateTimeField(null=True, blank=True)
     translation_meta = models.JSONField(
