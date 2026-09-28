@@ -137,9 +137,13 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "cover_url",
             "service_charge_percent",
             "qr_color",
-            "qr_logo",
+            "qr_center",
             "qr_style",
             "qr_eyes",
+            "qr_frame",
+            "qr_title",
+            "qr_text",
+            "qr_show_link",
             "plan",
             "is_active",
             "translation_meta",
@@ -211,12 +215,16 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
         if "extra_phones" in attrs:
             main = attrs.get("phone", getattr(self.instance, "phone", ""))
             attrs["extra_phones"] = clean_phone_list(attrs["extra_phones"], main)
-        if attrs.get("qr_logo"):
+        if attrs.get("qr_center") == "logo":
             logo = attrs["logo"] if "logo" in attrs else getattr(self.instance, "logo", None)
             if not logo:
                 raise serializers.ValidationError(
-                    {"qr_logo": "Avval Sozlamalarda restoran logotipini yuklang."}
+                    {"qr_center": "Avval Sozlamalarda restoran logotipini yuklang."}
                 )
+        # Yozuvlar chetidagi bo'sh joylarsiz — bo'sh qolsa standart matn chiqadi.
+        for key in ("qr_title", "qr_text"):
+            if key in attrs:
+                attrs[key] = " ".join((attrs[key] or "").split())
         return attrs
 
 

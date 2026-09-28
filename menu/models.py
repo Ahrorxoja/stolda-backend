@@ -163,8 +163,22 @@ class Restaurant(models.Model):
     service_charge_percent = models.PositiveSmallIntegerField(default=0)
     #: QR nuqtalarining rangi — oq fonga nisbatan yetarlicha to'q (`menu/qr.py`).
     qr_color = models.CharField("QR rangi", max_length=7, default="#231c17")
-    #: QR o'rtasiga restoran logotipi qo'yilsinmi.
-    qr_logo = models.BooleanField("QR'da logotip", default=False)
+    #: QR o'rtasi: vilka-pichoq belgisi (sukut), restoran logotipi yoki bo'sh.
+    qr_center = models.CharField(
+        "QR o'rtasi", max_length=8, choices=qr_codes.CENTER_CHOICES, default="icon"
+    )
+    #: Chop etiladigan kartochka: och (krem) yoki to'q (QR rangidagi) fon.
+    qr_frame = models.CharField(
+        "QR kartochka foni",
+        max_length=8,
+        choices=[("light", "Och"), ("dark", "To'q")],
+        default="light",
+    )
+    #: Kartochkadagi yozuvlar. Bo'sh — restoran tilida standart matn
+    #: ("MENYU", "Kamerani qarating") va boshqa tillardagi tarjimasi.
+    qr_title = models.CharField("QR sarlavhasi", max_length=24, blank=True)
+    qr_text = models.CharField("QR izohi", max_length=60, blank=True)
+    qr_show_link = models.BooleanField("Kartochkada havola", default=True)
     #: Nuqta shakli va burchak kvadratlari — `menu/qr.py` dagi ro'yxatlardan.
     qr_style = models.CharField(
         "QR nuqta shakli", max_length=16, choices=qr_codes.STYLE_CHOICES, default="square"

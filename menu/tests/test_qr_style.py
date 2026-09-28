@@ -71,7 +71,8 @@ class QrStyleApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(decoded(response.content), [self.restaurant.qr_url])
         self.assertIn((0x23, 0x1C, 0x17), pixel_colors(response.content))
-        self.assertEqual(response["X-QR-Logo"], "0")
+        # Sukut bo'yicha o'rtada vilka-pichoq — "bu menyu" ekani bilinsin.
+        self.assertEqual(response["X-QR-Center"], "icon")
 
     def test_owner_saves_a_color_and_downloads_use_it(self):
         response = self.client.patch(self.url, {"qr_color": "7A1F2B"}, format="json")
@@ -94,19 +95,19 @@ class QrStyleApiTests(TestCase):
         self.assertEqual(self.restaurant.qr_color, "#231c17")
 
     def test_logo_needs_an_uploaded_logo(self):
-        response = self.client.patch(self.url, {"qr_logo": True}, format="json")
+        response = self.client.patch(self.url, {"qr_center": "logo"}, format="json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("qr_logo", response.data)
+        self.assertIn("qr_center", response.data)
 
     def test_logo_in_the_middle_still_scans(self):
         self.client.patch(self.url, {"logo": logo_file()}, format="multipart")
-        response = self.client.patch(self.url, {"qr_logo": True}, format="json")
+        response = self.client.patch(self.url, {"qr_center": "logo"}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
 
         png = self.qr_png()
 
-        self.assertEqual(png["X-QR-Logo"], "1")
+        self.assertEqual(png["X-QR-Center"], "logo")
         self.assertEqual(decoded(png.content), [self.restaurant.qr_url])
         # Logotipning oltinrang qismi QR ichida ko'rinadi.
         self.assertTrue(any(abs(r - 0xC4) < 12 and abs(g - 0x90) < 12 for r, g, _ in pixel_colors(png.content)))
@@ -125,7 +126,7 @@ class QrStyleApiTests(TestCase):
 
     def test_logo_that_breaks_scanning_falls_back_to_plain_qr(self):
         self.client.patch(self.url, {"logo": logo_file()}, format="multipart")
-        Restaurant.objects.filter(pk=self.restaurant.pk).update(qr_logo=True)
+        Restaurant.objects.filter(pk=self.restaurant.pk).update(qr_center="logo")
 
         original = qr.LOGO_SHARE
         qr.LOGO_SHARE = 0.6  # QR'ning katta qismini yopadi — o'qib bo'lmaydi
@@ -134,7 +135,7 @@ class QrStyleApiTests(TestCase):
         finally:
             qr.LOGO_SHARE = original
 
-        self.assertEqual(png["X-QR-Logo"], "0")
+        self.assertEqual(png["X-QR-Center"], "none")
         self.assertEqual(decoded(png.content), [self.restaurant.qr_url])
 
 
@@ -150,14 +151,14 @@ class QrShapeTests(TestCase):
         self.client.patch(self.url, {"logo": logo_file()}, format="multipart")
         for style in qr.STYLES:
             for eyes in qr.EYES:
-                for logo in (0, 1):
-                    with self.subTest(style=style, eyes=eyes, logo=logo):
+                for center in qr.CENTERS:
+                    with self.subTest(style=style, eyes=eyes, center=center):
                         response = self.client.get(
-                            f"{self.url}qr/?format=png&style={style}&eyes={eyes}&logo={logo}"
+                            f"{self.url}qr/?format=png&style={style}&eyes={eyes}&center={center}"
                         )
                         self.assertEqual(response.status_code, 200)
                         self.assertEqual(response["X-QR-Style"], f"{style}:{eyes}")
-                        self.assertEqual(response["X-QR-Logo"], str(logo))
+                        self.assertEqual(response["X-QR-Center"], center)
                         self.assertEqual(decoded(response.content), [self.restaurant.qr_url])
 
     def test_shape_is_saved_and_used_for_downloads(self):
@@ -181,7 +182,7 @@ class QrShapeTests(TestCase):
         self.assertEqual(self.client.get(f"{self.url}qr/?format=png&eyes=x").status_code, 400)
 
     def test_unreadable_shape_falls_back_to_classic(self):
-        Restaurant.objects.filter(pk=self.restaurant.pk).update(qr_style="dots")
+        Restaurant.objects.filter(pk=self.restaurant.pk).update(qr_style="dots", qr_center="none")
         real = qr.decodes_to
         attempts = []
 
