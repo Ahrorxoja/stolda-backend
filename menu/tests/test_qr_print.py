@@ -48,6 +48,20 @@ class QrPrintTests(TestCase):
                     self.assertAlmostEqual(image.width / image.height, width_mm / height_mm, places=2)
                     self.assertIn(self.restaurant.qr_url, decoded(image))
 
+    def test_plain_qr_template_has_no_frame_or_text(self):
+        self.client.patch(self.url, {"qr_frame": "dark", "qr_color": "#1f4e3d"}, format="json")
+
+        image = image_of(self.get("format=image&template=qr&dpi=150"))
+
+        self.assertEqual(image.width, image.height)
+        # To'q fon tanlangan bo'lsa ham — oq, faqat QR rangli.
+        self.assertEqual(image.getpixel((1, 1)), (255, 255, 255))
+        self.assertIn((0x1F, 0x4E, 0x3D), set(image.getdata()))
+        self.assertIn(self.restaurant.qr_url, decoded(image))
+        pdf = self.get("format=pdf&template=qr")
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+        self.assertIn("-qr-qr.pdf", pdf["Content-Disposition"])
+
     def test_old_a6_and_a4_links_still_work(self):
         for fmt, template in (("a6", "card"), ("a4", "poster")):
             response = self.get(f"format={fmt}")

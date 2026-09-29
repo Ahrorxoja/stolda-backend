@@ -1,4 +1,5 @@
-"""Chop etiladigan QR kartochkalari: stol tenti, kartochka (A6), stiker, poster (A4).
+"""Chop etiladigan QR kartochkalari: stol tenti, kartochka (A6), stiker, poster (A4)
+va ramkasiz "faqat QR".
 
 Oddiy QR "bu nima?" degan savolga javob bermaydi — mijoz uni Wi-Fi yoki
 reklama deb o'ylaydi. Shuning uchun QR doim ramka ichida: katta "MENYU"
@@ -27,6 +28,8 @@ TEMPLATES = {
     "card": ("Kartochka A6", 105, 148),
     "sticker": ("Stiker 8×8", 80, 80),
     "poster": ("Poster A4", 210, 297),
+    #: Ramkasiz, yozuvsiz — o'z dizayni, menyu kitobchasi yoki bosmaxona uchun.
+    "qr": ("Faqat QR", 100, 100),
 }
 FRAMES = ("light", "dark")
 
@@ -338,6 +341,12 @@ def render_template(restaurant, template: str, *, dpi: int = PRINT_DPI, qr_optio
         **design_options,
     )
     _, width, height = TEMPLATES[template]
+
+    if template == "qr":
+        # Faqat QR: oq fon, ramka va yozuvlarsiz. QR rasmida chetdagi
+        # bo'sh hoshiya (quiet zone) bor — skaner uchun shu yetarli.
+        side = Canvas(width, height, dpi, (255, 255, 255)).px(width)
+        return rendered.image.resize((side, side), Image.Resampling.LANCZOS).convert("RGB")
 
     if template == "tent":
         face_h = height / 2
