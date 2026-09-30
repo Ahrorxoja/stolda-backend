@@ -129,6 +129,23 @@ class GoogleAuthTests(TestCase):
 
     @override_settings(GOOGLE_CLIENT_ID="test-client-id")
     @patch("menu.auth.google_id_token.verify_oauth2_token")
+    def test_google_name_is_saved_once(self, verify):
+        verify.return_value = {
+            "email": "chef@example.com", "email_verified": True,
+            "given_name": "Ahror", "family_name": "Usmonov",
+        }
+        self._post()
+        user = get_user_model().objects.get(username="chef@example.com")
+        self.assertEqual(user.get_full_name(), "Ahror Usmonov")
+
+        user.first_name, user.last_name = "Boshqa", ""
+        user.save()
+        self._post()  # o'zi o'zgartirgan ism ustiga yozilmaydi
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Boshqa")
+
+    @override_settings(GOOGLE_CLIENT_ID="test-client-id")
+    @patch("menu.auth.google_id_token.verify_oauth2_token")
     def test_unverified_email_is_rejected(self, verify):
         verify.return_value = {"email": "chef@example.com", "email_verified": False}
         response = self._post()

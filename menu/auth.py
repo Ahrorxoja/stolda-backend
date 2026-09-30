@@ -150,6 +150,11 @@ class GoogleAuthSerializer(serializers.Serializer):
         if created:
             user.set_unusable_password()
             user.save(update_fields=["password"])
+        # Panelda pochta emas, ism ko'rinsin — Google'dagi ism (bo'sh bo'lsagina).
+        if not user.first_name and not user.last_name and payload.get("given_name"):
+            user.first_name = payload["given_name"][:150]
+            user.last_name = (payload.get("family_name") or "")[:150]
+            user.save(update_fields=["first_name", "last_name"])
         # Menejer havolani yo'qotgan bo'lsa ham kirishi uchun: shu pochtaga
         # yuborilgan taklif shu yerda qabul qilinadi.
         accept_pending_for(user)
