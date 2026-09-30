@@ -17,6 +17,7 @@ import io
 import logging
 import re
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -43,7 +44,17 @@ BTN_MY_VISITS = "📒 Borgan joylarim"
 BTN_PLACES = "🗺 Barcha joylar"
 BTN_PARTNERS = "🤝 Hamkorlarimiz"
 
-KEYBOARD = [
+BTN_APP = "📱 Ilovani ochish"
+
+
+def _app_row() -> list[list]:
+    """Mini App tugmasi — Telegram faqat HTTPS manzilni qabul qiladi (localda yo'q)."""
+    if not settings.SITE_URL.startswith("https://"):
+        return []
+    return [[{"text": BTN_APP, "web_app": {"url": f"{settings.SITE_URL}/agent"}}]]
+
+
+KEYBOARD = _app_row() + [
     [BTN_VISIT, BTN_MY_VISITS],
     [BTN_SEARCH, BTN_PLACES],
     [BTN_PARTNERS, BTN_RESTAURANTS],
@@ -713,7 +724,8 @@ def _help(bot, agent: Agent) -> None:
         f"5. Har borgan joyingizni «{BTN_VISIT}» orqali yozing. Borishdan oldin «{BTN_SEARCH}» bilan "
         f"tekshiring: 🟢 mijoz yoki 🟡 band joyga bormang.\n"
         f"6. «{BTN_MY_VISITS}» — o'zingiz borgan joylar, «{BTN_PLACES}» — hamma agentlar borgan joylar, "
-        f"«{BTN_PARTNERS}» — stolda.uz'dan foydalanayotgan restoranlar.\n\n"
+        f"«{BTN_PARTNERS}» — stolda.uz'dan foydalanayotgan restoranlar.\n"
+        f"7. «{BTN_APP}» — hammasi bitta ilovada: joy yozish, jurnal, restoranlar, daromad.\n\n"
         f"To'liq qoidalar: «{BTN_RULES}»\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,

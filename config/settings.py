@@ -133,6 +133,8 @@ REST_FRAMEWORK = {
         "signup": "20/hour",
         # Agent kodini tekshirish — kodlarni tanlab ko'rishga qarshi.
         "agent_check": "30/hour",
+        # Agentlar Mini App'i: borgan joy yozish, karta, pul yechish.
+        "agent_app_write": "60/hour",
     },
 }
 
@@ -236,3 +238,7 @@ CORS_ALLOWED_ORIGINS = env_list(
 #: QR oldindan ko'rishida logotip haqiqatan qo'yilganini brauzer o'qiy olsin
 #: (localda frontend boshqa portda — sarlavha ochiq e'lon qilinmasa ko'rinmaydi).
 CORS_EXPOSE_HEADERS = ["X-QR-Center", "X-QR-Style"]
+# Agentlar Mini App'i imzosini shu sarlavhada yuboradi (`agents/webapp.py`).
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (*default_headers, "x-telegram-init-data")

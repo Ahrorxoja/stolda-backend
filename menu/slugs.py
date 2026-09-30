@@ -10,6 +10,8 @@ RESERVED_SLUGS = {
     # Landing'ning til sahifalari (`/ru`, `/en`) va xizmat yo'llari —
     # restoran shu manzilni olsa, uning menyusi ochilmay qolardi.
     "uz", "ru", "en", "join", "sitemap", "robots", "brand", "icon", "django-admin",
+    # Agentlar Mini App'i (`/agent`).
+    "agent",
 }
 
 
