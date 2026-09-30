@@ -38,15 +38,20 @@ BTN_HELP = "❓ Yordam"
 
 BTN_VISIT = "➕ Borgan joyim"
 BTN_SEARCH = "🔍 Qidirish"
+BTN_MY_VISITS = "📒 Borgan joylarim"
+BTN_PLACES = "🗺 Barcha joylar"
+BTN_PARTNERS = "🤝 Hamkorlarimiz"
 
 KEYBOARD = [
-    [BTN_VISIT, BTN_SEARCH],
+    [BTN_VISIT, BTN_MY_VISITS],
+    [BTN_SEARCH, BTN_PLACES],
+    [BTN_PARTNERS, BTN_RESTAURANTS],
     [BTN_LINK, BTN_BALANCE],
-    [BTN_RESTAURANTS, BTN_WITHDRAW],
-    [BTN_CARD, BTN_HELP],
+    [BTN_WITHDRAW, BTN_CARD, BTN_HELP],
 ]
 
 BTN_ALL = "📋 Hammasi"
+BTN_ALL_REGIONS = "🌍 Hamma viloyatlar"
 BTN_NEW_ADDRESS = "➕ Boshqa manzil (yangi joy)"
 
 STATE_VISIT_REGION = "visit_region"
@@ -57,7 +62,11 @@ STATE_VISIT_OUTCOME = "visit_outcome"
 STATE_VISIT_COMMENT = "visit_comment"
 STATE_SEARCH_REGION = "search_region"
 STATE_SEARCH_QUERY = "search_query"
+STATE_PLACES_REGION = "places_region"
+STATE_PARTNERS_REGION = "partners_region"
 JOURNAL_STATES = {
+    STATE_PLACES_REGION,
+    STATE_PARTNERS_REGION,
     STATE_VISIT_REGION,
     STATE_VISIT_NAME,
     STATE_VISIT_PICK,
@@ -463,6 +472,29 @@ def _search(bot, agent: Agent) -> None:
     bot.send(agent.telegram_chat_id, "🔍 Qaysi viloyatda qidiramiz?", keyboard=_region_keyboard())
 
 
+def _send_parts(bot, chat_id: str, parts: list[str]) -> None:
+    for text in journal.chunks(parts):
+        bot.send(chat_id, text, keyboard=KEYBOARD)
+
+
+def _my_visits(bot, agent: Agent) -> None:
+    _send_parts(bot, agent.telegram_chat_id, journal.my_visits_parts(agent))
+
+
+def _places(bot, agent: Agent) -> None:
+    _step(agent, STATE_PLACES_REGION)
+    bot.send(agent.telegram_chat_id, "🗺 Qaysi viloyatdagi joylarni ko'ramiz?", keyboard=_region_keyboard())
+
+
+def _partners(bot, agent: Agent) -> None:
+    _step(agent, STATE_PARTNERS_REGION)
+    bot.send(
+        agent.telegram_chat_id,
+        "🤝 Qaysi viloyatdagi hamkorlarimizni ko'ramiz?",
+        keyboard=[[BTN_ALL_REGIONS]] + _region_keyboard(),
+    )
+
+
 def _ask_outcome(bot, agent: Agent) -> None:
     _step(agent, STATE_VISIT_OUTCOME)
     bot.send(agent.telegram_chat_id, "4/5. Natija qanday bo'ldi?", keyboard=OUTCOME_KEYBOARD)
@@ -473,10 +505,20 @@ def _continue_journal(bot, agent: Agent, text: str) -> None:
     state = agent.bot_state
     draft = agent.bot_draft or {}
 
-    if state in (STATE_VISIT_REGION, STATE_SEARCH_REGION):
+    if state == STATE_PARTNERS_REGION and text == BTN_ALL_REGIONS:
+        _reset_journal(agent)
+        _send_parts(bot, chat_id, journal.partners_parts())
+        return
+
+    if state in (STATE_VISIT_REGION, STATE_SEARCH_REGION, STATE_PLACES_REGION, STATE_PARTNERS_REGION):
         region = match_region(text)
         if not region:
             bot.send(chat_id, "Viloyatni pastdagi tugmalardan tanlang 👇", keyboard=_region_keyboard())
+            return
+        if state in (STATE_PLACES_REGION, STATE_PARTNERS_REGION):
+            _reset_journal(agent)
+            parts = journal.places_parts(region) if state == STATE_PLACES_REGION else journal.partners_parts(region)
+            _send_parts(bot, chat_id, parts)
             return
         if state == STATE_SEARCH_REGION:
             _step(agent, STATE_SEARCH_QUERY, region=region)
@@ -502,7 +544,7 @@ def _continue_journal(bot, agent: Agent, text: str) -> None:
             return
         region = draft.get("region", "")
         _reset_journal(agent)
-        bot.send(chat_id, journal.search_text(region, query)[:4000], keyboard=KEYBOARD)
+        _send_parts(bot, chat_id, [journal.search_text(region, query)])
         return
 
     if state == STATE_VISIT_NAME:
@@ -668,7 +710,9 @@ def _help(bot, agent: Agent) -> None:
         f"eslatib qo'ying. Restoran to'lab tursa, siz ham har oy daromad olasiz.\n"
         f"4. Balans {services.money(services.MIN_WITHDRAWAL)} dan oshsa — «{BTN_WITHDRAW}».\n\n"
         f"5. Har borgan joyingizni «{BTN_VISIT}» orqali yozing. Borishdan oldin «{BTN_SEARCH}» bilan "
-        f"tekshiring: 🟢 mijoz yoki 🟡 band joyga bormang.\n\n"
+        f"tekshiring: 🟢 mijoz yoki 🟡 band joyga bormang.\n"
+        f"6. «{BTN_MY_VISITS}» — o'zingiz borgan joylar, «{BTN_PLACES}» — hamma agentlar borgan joylar, "
+        f"«{BTN_PARTNERS}» — stolda.uz'dan foydalanayotgan restoranlar.\n\n"
         f"To'liq qoidalar: /qoidalar\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,
@@ -678,6 +722,9 @@ def _help(bot, agent: Agent) -> None:
 _BUTTONS = {
     BTN_VISIT: _visit,
     BTN_SEARCH: _search,
+    BTN_MY_VISITS: _my_visits,
+    BTN_PLACES: _places,
+    BTN_PARTNERS: _partners,
     BTN_LINK: _link,
     BTN_BALANCE: _balance,
     BTN_RESTAURANTS: _restaurants,
@@ -685,11 +732,14 @@ _BUTTONS = {
     BTN_CARD: _card,
     BTN_HELP: _help,
 }
-_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help}
+_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help, _my_visits}
 
 _COMMANDS = {
     "/joy": _visit,
     "/qidirish": _search,
+    "/joylarim": _my_visits,
+    "/joylar": _places,
+    "/hamkorlar": _partners,
     "/havola": _link,
     "/balans": _balance,
     "/restoranlar": _restaurants,

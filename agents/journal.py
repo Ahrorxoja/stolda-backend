@@ -58,16 +58,18 @@ def same_name_places(region: str, name: str) -> list[Place]:
     return list(Place.objects.filter(region=region, name_key=place_key(name)).order_by("address"))
 
 
+PARTNER_STATUSES = [Subscription.Status.TRIALING, Subscription.Status.ACTIVE, Subscription.Status.PAST_DUE]
+
+
+def partners():
+    """stolda.uz'dan foydalanayotgan restoranlar (namuna/yashirinlari emas)."""
+    return Restaurant.objects.filter(subscription__status__in=PARTNER_STATUSES, is_active=True, is_listed=True)
+
+
 def clients_like(region: str, query: str, limit: int = 5) -> list[Restaurant]:
     """stolda.uz'dan foydalanayotgan restoranlar — shu viloyatda (yoki viloyati noma'lum)."""
     key = place_key(query)
-    queryset = Restaurant.objects.filter(
-        subscription__status__in=[
-            Subscription.Status.TRIALING,
-            Subscription.Status.ACTIVE,
-            Subscription.Status.PAST_DUE,
-        ]
-    ).filter(models_region_q(region))
+    queryset = partners().filter(models_region_q(region))
     found = []
     for restaurant in queryset.only("name", "region"):
         if key and key in place_key(restaurant.name):
@@ -201,3 +203,87 @@ def search_text(region: str, query: str) -> str:
     if len(parts) == 1:
         parts.append("Hech narsa topilmadi — bu joyga hali hech kim bormagan. Bemalol boring ✅")
     return "\n\n".join(parts)
+
+
+def my_visits_parts(agent: Agent, limit: int = 20) -> list[str]:
+    """Agentning o'zi borgan joylar — har joy bir marta, oxirgi tashrifi bilan."""
+    visits = Visit.objects.filter(agent=agent).select_related("place")
+    total = visits.count()
+    if not total:
+        return ["📒 Hali borgan joyingiz yozilmagan. Borgan har bir joyni «➕ Borgan joyim» orqali yozing."]
+    latest: dict[int, Visit] = {}
+    for visit in visits:
+        latest.setdefault(visit.place_id, visit)
+    parts = [f"📒 <b>Borgan joylaringiz</b> — {len(latest)} ta joy, {total} ta tashrif"]
+    for visit in list(latest.values())[:limit]:
+        place = visit.place
+        lines = [f"📍 <b>{place.name}</b> — {place.address} ({place.region})"]
+        if place.restaurant_id:
+            lines.append("   🟢 stolda.uz mijozi")
+        held = reservation(place)
+        if held and held.agent and held.agent.pk == agent.pk:
+            lines.append(f"   🟡 Sizga band — {held.days_left} kun qoldi")
+        lines.append(f"   {visit.get_outcome_display()} · {ago(visit.created_at)}")
+        if visit.comment:
+            lines.append(f"   «{visit.comment}»")
+        parts.append("\n".join(lines))
+    if len(latest) > limit:
+        parts.append(f"… va yana {len(latest) - limit} ta joy (oxirgi {limit} tasi ko'rsatildi).")
+    return parts
+
+
+def places_parts(region: str, limit: int = 30) -> list[str]:
+    """Viloyatdagi hamma agentlar borgan joylar — oxirgi tashrif bo'yicha."""
+    places = list(Place.objects.filter(region=region).prefetch_related("visits__agent"))
+    if not places:
+        return [f"🗺 <b>{region}</b>\n\nBu viloyatda hali hech kim bormagan — birinchi bo'ling ✅"]
+    places.sort(key=_last_visit_time, reverse=True)
+    counts: dict[str, int] = {}
+    for place in places:
+        visits = list(place.visits.all())
+        if visits:
+            label = Visit.Outcome(visits[0].outcome).label
+            counts[label] = counts.get(label, 0) + 1
+    summary = " · ".join(f"{label.split()[0]} {n}" for label, n in counts.items())
+    parts = [f"🗺 <b>{region}</b> — {len(places)} ta joy\n{summary}\n\n🟢 mijoz · 🟡 band — bormang"]
+    parts += [place_card(place, visits_limit=1) for place in places[:limit]]
+    if len(places) > limit:
+        parts.append(f"… va yana {len(places) - limit} ta. Aniq joyni «🔍 Qidirish» bilan toping.")
+    return parts
+
+
+def partners_parts(region: str = "") -> list[str]:
+    """stolda.uz hamkorlari — viloyat bo'yicha (bo'sh — hamma viloyatlar)."""
+    from menu.translations import translate
+
+    queryset = partners().order_by("region", "name")
+    if region:
+        queryset = queryset.filter(region=region)
+    restaurants = list(queryset.only("name", "region", "address", "primary_language"))
+    title = f"🤝 <b>Hamkorlarimiz</b> — {region or 'hamma viloyatlar'} ({len(restaurants)})"
+    if not restaurants:
+        return [title + "\n\nBu viloyatda hali hamkorimiz yo'q — birinchisini siz ulang 💪"]
+    parts = [title + "\n\nBular stolda.uz'dan foydalanadi — ularga bormang."]
+    groups: dict[str, list[str]] = {}
+    for restaurant in restaurants:
+        address = translate(restaurant.address, restaurant.primary_language) or ""
+        line = f"🟢 <b>{restaurant.name}</b>" + (f" — {address}" if address else "")
+        groups.setdefault(restaurant.region or "Viloyati ko'rsatilmagan", []).append(line)
+    for name, lines in groups.items():
+        parts.append((f"<b>{name}</b>\n" if not region else "") + "\n".join(lines))
+    return parts
+
+
+def chunks(parts: list[str], size: int = 3800) -> list[str]:
+    """Telegram 4096 belgidan uzun xabar olmaydi — qismlarni bo'lib beradi."""
+    messages, current = [], ""
+    for part in parts:
+        part = part[:size]
+        if current and len(current) + len(part) + 2 > size:
+            messages.append(current)
+            current = part
+        else:
+            current = f"{current}\n\n{part}" if current else part
+    if current:
+        messages.append(current)
+    return messages

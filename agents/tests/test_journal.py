@@ -192,3 +192,72 @@ class LinkRestaurantTests(AgentTestCase):
 
         self.place.refresh_from_db()
         self.assertIsNone(self.place.restaurant)
+
+
+class JournalListsTests(AgentTestCase):
+    """«Borgan joylarim», «Barcha joylar», «Hamkorlarimiz»."""
+
+    def setUp(self):
+        super().setUp()
+        self.bot = FakeChatBot()
+        self.ali = make_agent(name="Ali Valiyev", code="ALI", telegram_chat_id="1")
+        self.jasur = make_agent(name="Jasur Karimov", code="JASUR", telegram_chat_id="2")
+
+    say = JournalBotTests.say
+    log_visit = JournalBotTests.log_visit
+
+    def test_my_visits_shows_only_my_places_with_last_result(self):
+        self.log_visit(self.ali)
+        self.log_visit(self.ali, outcome=Visit.Outcome.REFUSED, comment="Qimmat dedi")
+        self.log_visit(self.jasur, name="Evos", address="Yunusobod")
+
+        text = self.say(self.ali, agent_bot.BTN_MY_VISITS)["text"]
+
+        self.assertIn("1 ta joy, 2 ta tashrif", text)
+        self.assertIn("Rayhon", text)
+        self.assertIn("Rad etdi", text)
+        self.assertIn("Qimmat dedi", text)
+        self.assertNotIn("Evos", text)
+
+    def test_my_visits_empty(self):
+        self.assertIn("Hali borgan joyingiz", self.say(self.ali, agent_bot.BTN_MY_VISITS)["text"])
+
+    def test_all_places_in_region_from_every_agent(self):
+        self.log_visit(self.ali)
+        self.log_visit(self.jasur, name="Evos", address="Yunusobod", outcome=Visit.Outcome.OTHER_QR)
+
+        self.say(self.ali, agent_bot.BTN_PLACES)
+        text = self.say(self.ali, "Toshkent shahri")["text"]
+
+        self.assertIn("2 ta joy", text)
+        self.assertIn("Rayhon", text)
+        self.assertIn("Evos", text)
+        self.assertIn("Jasur", text)
+        self.assertEqual(self.ali.bot_state, "")
+
+        self.say(self.ali, agent_bot.BTN_PLACES)
+        self.assertIn("hali hech kim", self.say(self.ali, "Samarqand")["text"])
+
+    def test_partners_by_region_and_all(self):
+        make_restaurant(slug="milliy", name="Milliy Taomlar", region="Toshkent shahri")
+        make_restaurant(slug="sam", name="Registon Cafe", region="Samarqand")
+        make_restaurant(slug="yopiq", name="Yopiq", region="Samarqand", subscription_status=Subscription.Status.SUSPENDED)
+        make_restaurant(slug="namuna", name="Namuna", region="Samarqand", is_listed=False)
+
+        self.say(self.ali, agent_bot.BTN_PARTNERS)
+        text = self.say(self.ali, "Samarqand")["text"]
+        self.assertIn("Registon Cafe", text)
+        self.assertNotIn("Milliy", text)
+        self.assertNotIn("Yopiq", text)
+        self.assertNotIn("Namuna", text)
+
+        self.say(self.ali, agent_bot.BTN_PARTNERS)
+        text = self.say(self.ali, agent_bot.BTN_ALL_REGIONS)["text"]
+        self.assertIn("(2)", text)
+        self.assertIn("<b>Samarqand</b>", text)
+        self.assertIn("Milliy Taomlar", text)
+
+    def test_long_lists_are_split(self):
+        messages = journal.chunks(["x" * 1000] * 10)
+        self.assertGreater(len(messages), 1)
+        self.assertTrue(all(len(message) <= 3800 for message in messages))
