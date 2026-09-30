@@ -27,7 +27,7 @@ class RestaurantAdmin(admin.ModelAdmin):
         "is_active",
         "dish_count",
     )
-    list_filter = ("is_active", "agent")
+    list_filter = ("is_active", "region", "agent")
     search_fields = (
         "name",
         "slug",

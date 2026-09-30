@@ -13,6 +13,8 @@ import secrets
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from menu.regions import REGION_CHOICES
+
 CODE_RE = re.compile(r"^[A-Z0-9]{3,16}$")
 
 
@@ -46,7 +48,7 @@ class Agent(models.Model):
     is_active = models.BooleanField(
         "Faol", default=True, help_text="O'chirilsa yangi restoran ham, yangi daromad ham yozilmaydi."
     )
-    #: Viloyat (botdagi ro'yxatdan) — `agents/bot.py: REGIONS`.
+    #: Viloyat (botdagi ro'yxatdan) — `menu/regions.py: REGIONS`.
     city = models.CharField("Viloyat", max_length=60, blank=True)
     #: Arizadagi "restoranlar bilan tanishlaringiz bormi?" javobi.
     note = models.CharField("Ariza izohi", max_length=300, blank=True)
@@ -77,6 +79,8 @@ class Agent(models.Model):
     telegram_username = models.CharField(max_length=64, blank=True, editable=False)
     #: Botdagi suhbat bosqichi (karta raqamini kutyapmizmi va h.k.).
     bot_state = models.CharField(max_length=16, blank=True, editable=False)
+    #: Ko'p qadamli yozuv (borgan joy, qidiruv) tugaguncha oraliq qiymatlar.
+    bot_draft = models.JSONField(default=dict, blank=True, editable=False)
 
     card_number = models.CharField("Karta raqami", max_length=19, blank=True)
     card_holder = models.CharField("Karta egasi", max_length=64, blank=True)
@@ -182,3 +186,73 @@ class AgentEarning(models.Model):
 
     def __str__(self) -> str:
         return f"{self.agent.code} · {self.restaurant_name} · {self.amount} so'm"
+
+
+# ── Borilgan joylar jurnali ────────────────────────────────────────────
+
+
+def place_key(value: str) -> str:
+    """Takrorni aniqlash uchun: "Oqtepa  Lavash'" → `oqtepalavash`."""
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+class Place(models.Model):
+    """Agentlar borgan restoran — hamma agentlar ko'radigan umumiy jurnal.
+
+    Bir viloyatda nomi va manzili bir xil bo'lsa — bitta joy, tashriflar
+    uning tarixiga qo'shiladi.
+    """
+
+    region = models.CharField("Viloyat", max_length=30, choices=REGION_CHOICES)
+    name = models.CharField("Nomi", max_length=60)
+    address = models.CharField("Manzil / mo'ljal", max_length=120)
+    name_key = models.CharField(max_length=60, db_index=True, editable=False)
+    address_key = models.CharField(max_length=120, editable=False)
+    #: Ulangach — stolda.uz'dagi restoran.
+    restaurant = models.ForeignKey(
+        "menu.Restaurant", on_delete=models.SET_NULL, null=True, blank=True, related_name="places"
+    )
+    created_by = models.ForeignKey(
+        Agent, on_delete=models.SET_NULL, null=True, blank=True, related_name="places_added"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("region", "name")
+        verbose_name = "borilgan joy"
+        verbose_name_plural = "borilgan joylar"
+        constraints = [
+            models.UniqueConstraint(fields=["region", "name_key", "address_key"], name="one_place_per_address")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} — {self.address} ({self.region})"
+
+    def save(self, *args, **kwargs):
+        self.name_key = place_key(self.name)
+        self.address_key = place_key(self.address)
+        super().save(*args, **kwargs)
+
+
+class Visit(models.Model):
+    class Outcome(models.TextChoices):
+        INTERESTED = "interested", "🤝 Qiziqdi, qayta boraman"
+        CONNECTED = "connected", "✅ Ulandi"
+        OTHER_QR = "other_qr", "📱 Boshqa QR menyusi bor"
+        REFUSED = "refused", "❌ Rad etdi"
+        NO_OWNER = "no_owner", "🚪 Egasi yo'q edi"
+
+    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name="visits")
+    agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True, related_name="visits")
+    outcome = models.CharField("Natija", max_length=12, choices=Outcome.choices)
+    comment = models.CharField("Izoh", max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "tashrif"
+        verbose_name_plural = "tashriflar"
+
+    def __str__(self) -> str:
+        return f"{self.place.name} · {self.get_outcome_display()}"
+

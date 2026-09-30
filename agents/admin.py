@@ -3,7 +3,8 @@ from django.db.models import Count, Q
 from django.utils.html import format_html
 
 from . import services
-from .models import Agent, AgentEarning, AgentWithdrawal
+from . import journal
+from .models import Agent, AgentEarning, AgentWithdrawal, Place, Visit
 
 
 class ApplicationFilter(admin.SimpleListFilter):
@@ -189,3 +190,49 @@ class AgentWithdrawalAdmin(admin.ModelAdmin):
     def mark_rejected(self, request, queryset):
         done = sum(services.settle_withdrawal(item, paid=False) for item in queryset)
         self.message_user(request, f"{done} ta so'rov rad etildi.", messages.WARNING)
+
+
+class VisitInline(admin.TabularInline):
+    model = Visit
+    extra = 0
+    fields = ("created_at", "agent", "outcome", "comment")
+    readonly_fields = ("created_at", "agent", "outcome")
+    ordering = ("-created_at",)
+
+
+@admin.register(Place)
+class PlaceAdmin(admin.ModelAdmin):
+    """Agentlar borgan joylar — noto'g'ri yozuvni tuzatish yoki o'chirish shu yerda."""
+
+    list_display = ("name", "address", "region", "last_outcome", "visits_count", "reserved", "restaurant")
+    list_filter = ("region",)
+    search_fields = ("name", "address")
+    readonly_fields = ("created_by", "created_at")
+    raw_id_fields = ("restaurant",)
+    inlines = (VisitInline,)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_visits=Count("visits")).prefetch_related("visits__agent")
+
+    @admin.display(description="oxirgi natija")
+    def last_outcome(self, obj: Place) -> str:
+        last = obj.visits.all()[:1]
+        return last[0].get_outcome_display() if last else "—"
+
+    @admin.display(description="tashriflar", ordering="_visits")
+    def visits_count(self, obj: Place) -> int:
+        return obj._visits
+
+    @admin.display(description="band")
+    def reserved(self, obj: Place) -> str:
+        held = journal.reservation(obj)
+        return f"🟡 {journal.first_name(held.agent)} ({held.days_left} kun)" if held else ""
+
+
+@admin.register(Visit)
+class VisitAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "place", "agent", "outcome", "comment")
+    list_filter = ("outcome", "place__region", "agent")
+    search_fields = ("place__name", "comment", "agent__name")
+    raw_id_fields = ("place",)
+

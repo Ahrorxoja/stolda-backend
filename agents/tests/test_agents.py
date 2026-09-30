@@ -52,6 +52,7 @@ class AgentTestCase(TestCase):
         patches = [
             patch("agents.services.get_agent_bot", return_value=self.agent_bot),
             patch("agents.services.get_bot", return_value=self.owner_bot),
+            patch("agents.journal.get_bot", return_value=self.owner_bot),
         ]
         for item in patches:
             item.start()
@@ -763,11 +764,12 @@ class RulesTests(AgentTestCase):
         agent = make_agent(telegram_chat_id=self.CHAT)
         self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
 
-        with patch("agents.rules.RULES_VERSION", "2"), patch("agents.bot.RULES_VERSION", "2"):
+        newer = str(int(RULES_VERSION) + 1)
+        with patch("agents.rules.RULES_VERSION", newer), patch("agents.bot.RULES_VERSION", newer):
             self.assertEqual(self.say(agent_bot.BTN_BALANCE)["keyboard"], agent_bot.RULES_KEYBOARD)
             self.say(agent_bot.BTN_ACCEPT)
             agent.refresh_from_db()
-            self.assertEqual(agent.rules_version, "2")
+            self.assertEqual(agent.rules_version, newer)
             self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
 
     def test_agent_can_reread_rules(self):

@@ -187,6 +187,9 @@ def attach(restaurant, agent: Agent) -> None:
     restaurant.agent = agent
     restaurant.agent_attached_at = timezone.now()
     restaurant.save(update_fields=["agent", "agent_attached_at"])
+    from .journal import link_restaurant  # journal → menu.models; aylanma import bo'lmasin
+
+    link_restaurant(restaurant, agent)
     notify_agent(
         agent,
         f"🎉 <b>{restaurant.name}</b> sizning kodingiz bilan ro'yxatdan o'tdi.\n"

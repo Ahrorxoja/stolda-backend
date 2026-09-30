@@ -9,7 +9,7 @@ Foizlar model sukutidan olinadi — shunda matn va hisob-kitob ajralib ketmaydi.
 
 from .models import Agent
 
-RULES_VERSION = "1"
+RULES_VERSION = "2"
 
 #: Telegram xabari 4096 belgidan oshmasin — shuning uchun ikki qismga bo'lingan.
 _PART_ONE = """📜 <b>stolda.uz agent qoidalari</b> (v{version})
@@ -32,9 +32,13 @@ Agent stolda.uz QR menyusini restoran va kafelarga tanishtiradi va ularni ulaydi
 <b>4. Agentning vazifalari</b>
 • stolda.uz haqida to'g'ri va halol ma'lumot berish.
 • Restoranga menyuni kiritishda va QR kodlarni chop etib qo'yishda yordam berish.
-• Restoran bilan aloqada bo'lish: to'lov yaqinlashganda yoki kechiksa eslatish (bot o'zi xabar beradi)."""
+• Restoran bilan aloqada bo'lish: to'lov yaqinlashganda yoki kechiksa eslatish (bot o'zi xabar beradi).
+• Borgan har bir joyni «➕ Borgan joyim» orqali halol yozish: nomi va manzili lotin harflarida, natija va izoh bilan. Jurnalni hamma agentlar ko'radi.
+• Borishdan oldin «🔍 Qidirish» bilan tekshirish."""
 
 _PART_TWO = """<b>5. Taqiqlanadi</b>
+• stolda.uz mijozi (🟢) yoki boshqa agent bilan ishlanayotgan (🟡, «Qiziqdi» dan keyin 14 kun) joyga borish. Band paytida restoran boshqa agentning kodi bilan ulansa ham, daromad kod egasiga yoziladi — qoidabuzarlikni stolda.uz alohida ko'rib chiqadi.
+• Jurnalga yolg'on yoki haqoratli yozuv qoldirish.
 • Yolg'on va'da berish (masalan: «buyurtma qabul qiladi», «abadiy bepul», «chegirma beraman»).
 • Soxta yoki restoran egasining roziligisiz ro'yxatdan o'tkazish.
 • Spam, bosim o'tkazish, stolda.uz nomidan boshqa xizmat yoki to'lov so'rash.

@@ -128,6 +128,7 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "phone",
             "extra_phones",
             "city",
+            "region",
             "instagram",
             "facebook",
             "telegram",

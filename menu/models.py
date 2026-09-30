@@ -15,6 +15,7 @@ from django.utils import timezone
 from . import qr as qr_codes
 from .hours import default_working_hours, validate_working_hours
 from .phones import validate_phone_list
+from .regions import REGION_CHOICES
 from .translations import (
     DEFAULT_LANGUAGE,
     LANGUAGE_NAMES,
@@ -154,6 +155,8 @@ class Restaurant(models.Model):
     )
     #: Bog'lanish uchun ko'rsatiladi, menyuda tarjima qilinmaydi.
     city = models.CharField(max_length=80, blank=True)
+    #: Viloyat — agentlar qidiruvida "bu restoran allaqachon mijoz" deb ko'rsatish uchun.
+    region = models.CharField("Viloyat", max_length=30, choices=REGION_CHOICES, blank=True)
     #: Ijtimoiy sahifalar — foydalanuvchi nomi yoki to'liq havola.
     instagram = models.CharField(max_length=120, blank=True)
     facebook = models.CharField(max_length=120, blank=True)

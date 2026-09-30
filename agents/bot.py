@@ -21,9 +21,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from menu import qr as qr_codes
+from menu.regions import REGIONS, match_region
 
-from . import services
-from .models import Agent, AgentEarning
+from . import journal, services
+from .models import Agent, AgentEarning, Place, Visit
 from .rules import RULES_VERSION, accepted_current, rules_parts
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,37 @@ BTN_WITHDRAW = "💸 Pul yechish"
 BTN_CARD = "💳 Karta"
 BTN_HELP = "❓ Yordam"
 
-KEYBOARD = [[BTN_LINK, BTN_BALANCE], [BTN_RESTAURANTS, BTN_WITHDRAW], [BTN_CARD, BTN_HELP]]
+BTN_VISIT = "➕ Borgan joyim"
+BTN_SEARCH = "🔍 Qidirish"
+
+KEYBOARD = [
+    [BTN_VISIT, BTN_SEARCH],
+    [BTN_LINK, BTN_BALANCE],
+    [BTN_RESTAURANTS, BTN_WITHDRAW],
+    [BTN_CARD, BTN_HELP],
+]
+
+BTN_ALL = "📋 Hammasi"
+BTN_NEW_ADDRESS = "➕ Boshqa manzil (yangi joy)"
+
+STATE_VISIT_REGION = "visit_region"
+STATE_VISIT_NAME = "visit_name"
+STATE_VISIT_PICK = "visit_pick"
+STATE_VISIT_ADDRESS = "visit_address"
+STATE_VISIT_OUTCOME = "visit_outcome"
+STATE_VISIT_COMMENT = "visit_comment"
+STATE_SEARCH_REGION = "search_region"
+STATE_SEARCH_QUERY = "search_query"
+JOURNAL_STATES = {
+    STATE_VISIT_REGION,
+    STATE_VISIT_NAME,
+    STATE_VISIT_PICK,
+    STATE_VISIT_ADDRESS,
+    STATE_VISIT_OUTCOME,
+    STATE_VISIT_COMMENT,
+    STATE_SEARCH_REGION,
+    STATE_SEARCH_QUERY,
+}
 
 STATE_CARD_NUMBER = "card_number"
 STATE_CARD_HOLDER = "card_holder"
@@ -46,33 +77,7 @@ BTN_CANCEL = "❌ Bekor qilish"
 RULES_KEYBOARD = [[BTN_ACCEPT], [BTN_CANCEL]]
 BTN_SKIP = "O'tkazib yuborish"
 BTN_CONTACT = {"text": "📱 Raqamni yuborish", "request_contact": True}
-#: O'zbekistonning barcha hududlari — 12 viloyat, Qoraqalpog'iston, Toshkent shahri.
-REGIONS = [
-    "Toshkent shahri",
-    "Toshkent viloyati",
-    "Andijon",
-    "Buxoro",
-    "Farg'ona",
-    "Jizzax",
-    "Xorazm",
-    "Namangan",
-    "Navoiy",
-    "Qashqadaryo",
-    "Qoraqalpog'iston",
-    "Samarqand",
-    "Sirdaryo",
-    "Surxondaryo",
-]
 REGION_KEYBOARD = [REGIONS[i : i + 2] for i in range(0, len(REGIONS), 2)]
-
-
-def _match_region(text: str) -> str:
-    """Tugmadan yoki qo'lda yozilgan (katta-kichik harf, apostrof farqi bilan)."""
-    key = re.sub(r"[ʻʼ'`’‘\s]", "", text).lower()
-    for region in REGIONS:
-        if re.sub(r"['\s]", "", region).lower() == key:
-            return region
-    return ""
 
 
 UZ_PHONE = re.compile(r"^998[1-9]\d{8}$")
@@ -150,6 +155,16 @@ def handle_message(bot, message: dict) -> None:
         else:
             _show_rules(bot, chat_id, RULES_KEYBOARD)
         return
+    # Jurnal (borgan joy, qidiruv) — "Bekor qilish" yoki asosiy tugma chiqaradi.
+    if agent.bot_state in JOURNAL_STATES:
+        if text == BTN_CANCEL:
+            _reset_journal(agent)
+            bot.send(chat_id, "Bekor qilindi.", keyboard=KEYBOARD)
+            return
+        if text not in _BUTTONS:
+            _continue_journal(bot, agent, text)
+            return
+        _reset_journal(agent)
     # Karta kiritish bosqichi — tugma bosilsa bosqich bekor bo'ladi.
     if agent.bot_state and text not in _BUTTONS:
         _continue_card(bot, agent, text)
@@ -332,7 +347,7 @@ def _continue_application(bot, agent: Agent, text: str, contact: dict | None, se
         agent.phone, agent.bot_state = phone[:20], STATE_APPLY_CITY
 
     elif state == STATE_APPLY_CITY:
-        region = _match_region(text)
+        region = match_region(text)
         if not region:
             bot.send(chat_id, "Viloyatni pastdagi tugmalardan tanlang 👇", keyboard=REGION_KEYBOARD)
             return
@@ -417,6 +432,189 @@ def _restaurants(bot, agent: Agent) -> None:
     bot.send(agent.telegram_chat_id, "\n".join(lines), keyboard=KEYBOARD)
 
 
+# ── Borilgan joylar jurnali ────────────────────────────────────────────
+
+OUTCOME_KEYBOARD = [[label] for _, label in Visit.Outcome.choices] + [[BTN_CANCEL]]
+
+
+def _region_keyboard():
+    return REGION_KEYBOARD + [[BTN_CANCEL]]
+
+
+def _reset_journal(agent: Agent) -> None:
+    agent.bot_state, agent.bot_draft = "", {}
+    agent.save(update_fields=["bot_state", "bot_draft"])
+
+
+def _step(agent: Agent, state: str, **draft) -> None:
+    agent.bot_state = state
+    agent.bot_draft = {**(agent.bot_draft or {}), **draft}
+    agent.save(update_fields=["bot_state", "bot_draft"])
+
+
+def _visit(bot, agent: Agent) -> None:
+    agent.bot_state, agent.bot_draft = STATE_VISIT_REGION, {}
+    agent.save(update_fields=["bot_state", "bot_draft"])
+    bot.send(agent.telegram_chat_id, "➕ <b>Borgan joyingiz</b>\n\n1/5. Qaysi viloyatda?", keyboard=_region_keyboard())
+
+
+def _search(bot, agent: Agent) -> None:
+    _step(agent, STATE_SEARCH_REGION)
+    bot.send(agent.telegram_chat_id, "🔍 Qaysi viloyatda qidiramiz?", keyboard=_region_keyboard())
+
+
+def _ask_outcome(bot, agent: Agent) -> None:
+    _step(agent, STATE_VISIT_OUTCOME)
+    bot.send(agent.telegram_chat_id, "4/5. Natija qanday bo'ldi?", keyboard=OUTCOME_KEYBOARD)
+
+
+def _continue_journal(bot, agent: Agent, text: str) -> None:
+    chat_id = agent.telegram_chat_id
+    state = agent.bot_state
+    draft = agent.bot_draft or {}
+
+    if state in (STATE_VISIT_REGION, STATE_SEARCH_REGION):
+        region = match_region(text)
+        if not region:
+            bot.send(chat_id, "Viloyatni pastdagi tugmalardan tanlang 👇", keyboard=_region_keyboard())
+            return
+        if state == STATE_SEARCH_REGION:
+            _step(agent, STATE_SEARCH_QUERY, region=region)
+            bot.send(
+                chat_id,
+                "Restoran nomini yozing (lotincha, bir qismi ham bo'ladi — masalan «rayh») "
+                f"yoki «{BTN_ALL}» — shu viloyatdagi oxirgi tashriflar.",
+                keyboard=[[BTN_ALL], [BTN_CANCEL]],
+            )
+            return
+        _step(agent, STATE_VISIT_NAME, region=region)
+        bot.send(
+            chat_id,
+            "2/5. Restoran nomini <b>lotin harflarida</b> yozing, masalan: Oqtepa Lavash",
+            keyboard=[[BTN_CANCEL]],
+        )
+        return
+
+    if state == STATE_SEARCH_QUERY:
+        query = "" if text == BTN_ALL else text.strip()
+        if query and not journal.place_key(query):
+            bot.send(chat_id, "Lotin harflarida yozing, masalan: rayhon", keyboard=[[BTN_ALL], [BTN_CANCEL]])
+            return
+        region = draft.get("region", "")
+        _reset_journal(agent)
+        bot.send(chat_id, journal.search_text(region, query)[:4000], keyboard=KEYBOARD)
+        return
+
+    if state == STATE_VISIT_NAME:
+        name = journal.clean_latin(text)
+        if not name:
+            bot.send(
+                chat_id,
+                "Nomni faqat <b>lotin harflarida</b> yozing (2–60 belgi), masalan: Rayhon",
+                keyboard=[[BTN_CANCEL]],
+            )
+            return
+        existing = journal.same_name_places(draft["region"], name)
+        if existing:
+            _step(agent, STATE_VISIT_PICK, name=name, candidates={p.address: p.pk for p in existing[:8]})
+            cards = "\n\n".join(journal.place_card(place, visits_limit=2) for place in existing[:5])
+            bot.send(
+                chat_id,
+                f"Bu viloyatda «{name}» nomli joy(lar) bor:\n\n{cards}\n\n"
+                "3/5. Qaysi biriga bordingiz? Manzilni tanlang yoki yangi manzil qo'shing.",
+                keyboard=[[p.address] for p in existing[:8]] + [[BTN_NEW_ADDRESS], [BTN_CANCEL]],
+            )
+            return
+        _step(agent, STATE_VISIT_ADDRESS, name=name)
+        _ask_address(bot, agent)
+        return
+
+    if state == STATE_VISIT_PICK:
+        if text == BTN_NEW_ADDRESS:
+            _step(agent, STATE_VISIT_ADDRESS)
+            _ask_address(bot, agent)
+            return
+        place_id = (draft.get("candidates") or {}).get(text)
+        place = Place.objects.filter(pk=place_id).first() if place_id else None
+        if place is None:
+            bot.send(chat_id, "Pastdagi manzillardan birini tanlang 👇")
+            return
+        _step(agent, STATE_VISIT_OUTCOME, address=place.address)
+        _warn_if_taken(bot, agent, place)
+        _ask_outcome(bot, agent)
+        return
+
+    if state == STATE_VISIT_ADDRESS:
+        address = journal.clean_latin(text, min_len=3, max_len=120)
+        if not address:
+            bot.send(
+                chat_id,
+                "Manzil yoki mo'ljalni <b>lotin harflarida</b> yozing, masalan: Chilonzor 9-kvartal",
+                keyboard=[[BTN_CANCEL]],
+            )
+            return
+        _step(agent, STATE_VISIT_OUTCOME, address=address)
+        _ask_outcome(bot, agent)
+        return
+
+    if state == STATE_VISIT_OUTCOME:
+        outcome = next((value for value, label in Visit.Outcome.choices if label == text), "")
+        if not outcome:
+            bot.send(chat_id, "Natijani pastdagi tugmalardan tanlang 👇", keyboard=OUTCOME_KEYBOARD)
+            return
+        _step(agent, STATE_VISIT_COMMENT, outcome=outcome)
+        bot.send(
+            chat_id,
+            "5/5. Qisqa izoh yozing — boshqa agentlarga foydali bo'ladi.\n"
+            "Masalan: «Egasi dushanba qaytadi», «Narx qimmat dedi».",
+            keyboard=[[BTN_SKIP], [BTN_CANCEL]],
+        )
+        return
+
+    if state == STATE_VISIT_COMMENT:
+        comment = "" if text == BTN_SKIP else " ".join(text.split())[:300]
+        visit = journal.record_visit(
+            agent,
+            region=draft["region"],
+            name=draft["name"],
+            address=draft["address"],
+            outcome=draft["outcome"],
+            comment=comment,
+        )
+        _reset_journal(agent)
+        note = ""
+        if visit.outcome == Visit.Outcome.INTERESTED:
+            note = f"\n\n🟡 Joy sizga {journal.RESERVE_DAYS} kun band — boshqa agentlar buni ko'radi."
+        bot.send(
+            chat_id,
+            "✅ Yozildi.\n\n" + journal.place_card(visit.place) + note,
+            keyboard=KEYBOARD,
+        )
+        return
+
+    _reset_journal(agent)
+
+
+def _ask_address(bot, agent: Agent) -> None:
+    bot.send(
+        agent.telegram_chat_id,
+        "3/5. Manzil yoki mo'ljalni <b>lotin harflarida</b> yozing, masalan: Chilonzor 9-kvartal",
+        keyboard=[[BTN_CANCEL]],
+    )
+
+
+def _warn_if_taken(bot, agent: Agent, place: Place) -> None:
+    held = journal.reservation(place)
+    if place.restaurant_id:
+        bot.send(agent.telegram_chat_id, "🟢 Bu restoran allaqachon stolda.uz mijozi.")
+    elif held and held.agent and held.agent.pk != agent.pk:
+        bot.send(
+            agent.telegram_chat_id,
+            f"🟡 Bu joy bilan {journal.first_name(held.agent)} ishlayapti ({held.days_left} kun qoldi). "
+            "Qoidaga ko'ra, band paytida bu joyga bormaslik kerak.",
+        )
+
+
 def _next_date(subscription) -> str:
     """Restoran ro'yxatida — qachongacha to'langan / sinov / imtiyoz."""
     if subscription is None:
@@ -469,6 +667,8 @@ def _help(bot, agent: Agent) -> None:
         f"3. To'lov yaqinlashganda yoki kechiksa bot eslatadi — restoranga qo'ng'iroq qilib "
         f"eslatib qo'ying. Restoran to'lab tursa, siz ham har oy daromad olasiz.\n"
         f"4. Balans {services.money(services.MIN_WITHDRAWAL)} dan oshsa — «{BTN_WITHDRAW}».\n\n"
+        f"5. Har borgan joyingizni «{BTN_VISIT}» orqali yozing. Borishdan oldin «{BTN_SEARCH}» bilan "
+        f"tekshiring: 🟢 mijoz yoki 🟡 band joyga bormang.\n\n"
         f"To'liq qoidalar: /qoidalar\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,
@@ -476,6 +676,8 @@ def _help(bot, agent: Agent) -> None:
 
 
 _BUTTONS = {
+    BTN_VISIT: _visit,
+    BTN_SEARCH: _search,
     BTN_LINK: _link,
     BTN_BALANCE: _balance,
     BTN_RESTAURANTS: _restaurants,
@@ -486,6 +688,8 @@ _BUTTONS = {
 _ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help}
 
 _COMMANDS = {
+    "/joy": _visit,
+    "/qidirish": _search,
     "/havola": _link,
     "/balans": _balance,
     "/restoranlar": _restaurants,
