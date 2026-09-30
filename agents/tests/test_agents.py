@@ -791,3 +791,18 @@ class MenuCommandsTests(TestCase):
         for name in names[1:]:
             with self.subTest(name=name):
                 self.assertIn(f"/{name}", agent_bot._COMMANDS)
+
+    def test_rules_button_shows_rules_and_keeps_keyboard(self):
+        from agents import bot as agent_bot
+        from agents.rules import RULES_VERSION
+        from django.utils import timezone
+        from telegrambot import FakeChatBot
+
+        agent = Agent.objects.create(
+            name="Ali", code="ALI", telegram_chat_id="77", rules_version=RULES_VERSION, rules_accepted_at=timezone.now()
+        )
+        bot = FakeChatBot()
+        agent_bot.handle_message(bot, {"chat": {"id": agent.telegram_chat_id, "type": "private"}, "text": agent_bot.BTN_RULES})
+
+        self.assertIn("agent qoidalari", bot.sent[0]["text"])
+        self.assertEqual(bot.sent[-1]["keyboard"], agent_bot.KEYBOARD)

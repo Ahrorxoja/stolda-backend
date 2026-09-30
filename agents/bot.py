@@ -35,6 +35,7 @@ BTN_RESTAURANTS = "🍽 Restoranlarim"
 BTN_WITHDRAW = "💸 Pul yechish"
 BTN_CARD = "💳 Karta"
 BTN_HELP = "❓ Yordam"
+BTN_RULES = "📜 Qoidalar"
 
 BTN_VISIT = "➕ Borgan joyim"
 BTN_SEARCH = "🔍 Qidirish"
@@ -46,8 +47,8 @@ KEYBOARD = [
     [BTN_VISIT, BTN_MY_VISITS],
     [BTN_SEARCH, BTN_PLACES],
     [BTN_PARTNERS, BTN_RESTAURANTS],
-    [BTN_LINK, BTN_BALANCE],
-    [BTN_WITHDRAW, BTN_CARD, BTN_HELP],
+    [BTN_LINK, BTN_BALANCE, BTN_WITHDRAW],
+    [BTN_CARD, BTN_RULES, BTN_HELP],
 ]
 
 BTN_ALL = "📋 Hammasi"
@@ -719,6 +720,10 @@ def _help(bot, agent: Agent) -> None:
     )
 
 
+def _rules(bot, agent: Agent) -> None:
+    _show_rules(bot, agent.telegram_chat_id, KEYBOARD)
+
+
 _BUTTONS = {
     BTN_VISIT: _visit,
     BTN_SEARCH: _search,
@@ -731,8 +736,9 @@ _BUTTONS = {
     BTN_WITHDRAW: _withdraw,
     BTN_CARD: _card,
     BTN_HELP: _help,
+    BTN_RULES: _rules,
 }
-_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help, _my_visits}
+_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help, _my_visits, _rules}
 
 _COMMANDS = {
     "/joy": _visit,
@@ -746,7 +752,7 @@ _COMMANDS = {
     "/yechish": _withdraw,
     "/karta": _card,
     "/yordam": _help,
-    "/qoidalar": lambda bot, agent: _show_rules(bot, agent.telegram_chat_id, KEYBOARD),
+    "/qoidalar": _rules,
     "/help": _help,
 }
 
