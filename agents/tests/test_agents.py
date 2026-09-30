@@ -171,13 +171,44 @@ class EarningTests(AgentTestCase):
 
         self.assertEqual(AgentEarning.objects.count(), 1)
 
-    def test_next_payments_only_within_the_agreed_months(self):
+    def test_next_payments_continue_while_agent_is_active(self):
+        start = timezone.now()
+        self.pay(self.restaurant, when=start)
+        self.pay(self.restaurant, when=start + timedelta(days=13 * 30))
+        self.pay(self.restaurant, when=start + timedelta(days=3 * 365))
+
+        self.assertEqual(self.amounts(), [("first", 49_500), ("percent", 19_800), ("percent", 19_800)])
+
+    def test_deactivated_agent_stops_earning_but_keeps_balance(self):
+        self.pay(self.restaurant)
+        self.agent.is_active = False
+        self.agent.save()
+
+        self.pay(self.restaurant)
+
+        self.assertEqual(self.amounts(), [("first", 49_500)])
+        self.assertEqual(services.balance(self.agent).available, 49_500)
+
+    def test_optional_months_limit_per_agent(self):
+        self.agent.months = 12
+        self.agent.save()
         start = timezone.now()
         self.pay(self.restaurant, when=start)
         self.pay(self.restaurant, when=start + timedelta(days=11 * 30))
         self.pay(self.restaurant, when=start + timedelta(days=12 * 30 + 5))
 
         self.assertEqual(self.amounts(), [("first", 49_500), ("percent", 19_800)])
+
+    def test_restaurant_moved_to_another_agent(self):
+        self.pay(self.restaurant)
+        other = make_agent(name="Jasur", code="JASUR")
+        Restaurant.objects.filter(pk=self.restaurant.pk).update(agent=other)
+        self.restaurant.refresh_from_db()
+
+        self.pay(self.restaurant)
+
+        self.assertEqual(AgentEarning.objects.filter(agent=other).count(), 1)
+        self.assertEqual(AgentEarning.objects.filter(agent=self.agent).count(), 1)
 
     def test_inactive_agent_earns_nothing(self):
         self.agent.is_active = False
@@ -534,4 +565,79 @@ class ApplicationTests(AgentTestCase):
         self.assertEqual(services.generate_code("Алишер Усмонов"), "ALISHER")
         self.assertEqual(services.generate_code("Bo"), "BOAGE")
         self.assertEqual(services.generate_code("Oʻktam"), "OKTAM")
+
+
+class ReminderTests(AgentTestCase):
+    """Kunlik tekshiruv agentga: to'lov yaqin, muddat o'tdi, menyu to'xtadi."""
+
+    def setUp(self):
+        super().setUp()
+        self.agent = make_agent(telegram_chat_id=AGENT_CHAT_ID)
+        self.restaurant = make_restaurant(phone="+998901234567")
+        services.attach(self.restaurant, self.agent)
+        self.agent_bot.sent.clear()
+        self.subscription = self.restaurant.subscription
+
+    def run_daily(self):
+        from menu.tasks import process_subscriptions
+
+        with patch("menu.tasks.get_bot", return_value=FakeBot()), self.captureOnCommitCallbacks(execute=True):
+            process_subscriptions()
+        return self.agent_bot.texts(AGENT_CHAT_ID)
+
+    def set_end(self, days: float, status="active"):
+        end = timezone.now() + timedelta(days=days)
+        Subscription.objects.filter(pk=self.subscription.pk).update(
+            status=status,
+            current_period_end=end,
+            trial_ends_at=end if status == "trialing" else None,
+        )
+
+    def test_payment_due_in_three_days(self):
+        self.set_end(3.2)
+
+        texts = self.run_daily()
+
+        self.assertEqual(len(texts), 1)
+        self.assertIn("to'lov muddati", texts[0])
+        self.assertIn("Zamin", texts[0])
+        self.assertIn("+998 90 123 45 67", texts[0])
+
+    def test_trial_ending_asks_for_first_payment(self):
+        self.set_end(3.2, status="trialing")
+
+        self.assertIn("Birinchi to'lovni eslatib", self.run_daily()[0])
+
+    def test_overdue_and_suspended(self):
+        self.set_end(-0.1)
+        self.assertIn("muddati o'tdi", self.run_daily()[-1])
+
+        Subscription.objects.filter(pk=self.subscription.pk).update(
+            grace_ends_at=timezone.now() - timedelta(minutes=1)
+        )
+        self.assertIn("menyu to'xtatildi", self.run_daily()[-1])
+
+    def test_one_message_for_several_restaurants(self):
+        second = make_restaurant(slug="ikkinchi", name="Ikkinchi")
+        services.attach(second, self.agent)
+        self.agent_bot.sent.clear()
+        end = timezone.now() + timedelta(days=3.2)
+        Subscription.objects.update(status="active", current_period_end=end)
+
+        texts = self.run_daily()
+
+        self.assertEqual(len(texts), 1)
+        self.assertIn("Zamin", texts[0])
+        self.assertIn("Ikkinchi", texts[0])
+
+    def test_inactive_agent_gets_no_reminders(self):
+        Agent.objects.filter(pk=self.agent.pk).update(is_active=False)
+        self.set_end(3.2)
+
+        self.assertEqual(self.run_daily(), [])
+
+    def test_quiet_day_sends_nothing(self):
+        self.set_end(20)
+
+        self.assertEqual(self.run_daily(), [])
 

@@ -38,8 +38,12 @@ def terms(agent: Agent) -> str:
     return (
         f"Restoran sizning havolangiz yoki kodingiz bilan ro'yxatdan o'tsa, uning "
         f"<b>birinchi to'lovidan {agent.first_percent}%</b> (oylik yoki yillik) va "
-        f"<b>keyingi to'lovlaridan {agent.percent}%</b> ({agent.months} oy davomida) olasiz."
+        f"<b>keyingi to'lovlaridan {agent.percent}%</b> ({duration(agent.months)}) olasiz."
     )
+
+
+def duration(months: int) -> str:
+    return f"{months} oy davomida" if months else "restoran to'lashda davom etar ekan"
 
 
 def agent_link(agent: Agent) -> str:
@@ -213,13 +217,14 @@ def on_invoice_paid(invoice) -> list[AgentEarning]:
         return []
 
     # Birinchi to'lov (oylik yoki yillik) — `first_percent`; keyingilari —
-    # `percent`, faqat birinchi to'lovdan keyingi `months` oy ichida.
+    # `percent`: agent faol ekan cheksiz, `months` berilgan bo'lsa shuncha oy.
     if invoice.pk == first.pk:
         kind, percent = AgentEarning.Kind.FIRST, agent.first_percent
     else:
-        window_end = first.paid_at + timedelta(days=agent.months * DAYS_PER_MONTH)
-        if invoice.paid_at > window_end:
-            return []
+        if agent.months:
+            window_end = first.paid_at + timedelta(days=agent.months * DAYS_PER_MONTH)
+            if invoice.paid_at > window_end:
+                return []
         kind, percent = AgentEarning.Kind.PERCENT, agent.percent
 
     amount = invoice.amount * percent // 100
@@ -244,6 +249,46 @@ def on_invoice_paid(invoice) -> list[AgentEarning]:
         f"Balans: {money(balance(agent).available)}",
     )
     return [earning]
+
+
+# ── Eslatmalar (kunlik obuna tekshiruvidan) ────────────────────────────
+
+
+REMINDERS = {
+    "trial_soon": "⏰ <b>{name}</b> — bepul sinov {date} da tugaydi. Birinchi to'lovni eslatib qo'ying.",
+    "due_soon": "⏰ <b>{name}</b> — to'lov muddati {date} da tugaydi. Eslatib qo'ying.",
+    "past_due": "💳 <b>{name}</b> — to'lov muddati o'tdi. 7 kun ichida to'lasa, menyu to'xtamaydi.",
+    "suspended": "⛔️ <b>{name}</b> — to'lanmagani uchun menyu to'xtatildi. To'lasa darhol tiklanadi.",
+}
+
+
+def reminder_line(subscription, kind: str, when=None) -> str:
+    """Agentga bitta restoran haqida — qo'ng'iroq qilish uchun telefonlari bilan."""
+    restaurant = subscription.restaurant
+    profile = getattr(restaurant.owner, "profile", None)
+    phones = []
+    for phone in (restaurant.phone, getattr(profile, "contact_phone", "")):
+        if phone and format_phone(phone) not in phones:
+            phones.append(format_phone(phone))
+    date = timezone.localtime(when).strftime("%d.%m") if when else ""
+    line = REMINDERS[kind].format(name=restaurant.name, date=date)
+    return line + (f"\n📞 {', '.join(phones)}" if phones else "")
+
+
+def format_phone(phone: str) -> str:
+    """`+998901234567` → `+998 90 123 45 67` (boshqa ko'rinishdagisi o'zicha)."""
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) == 12 and digits.startswith("998"):
+        return f"+998 {digits[3:5]} {digits[5:8]} {digits[8:10]} {digits[10:12]}"
+    return phone
+
+
+def remind_agents(events: dict[int, list[str]]) -> None:
+    """Har agentga bitta xabar — bugun e'tibor kerak bo'lgan restoranlari."""
+    if not events:
+        return
+    for agent in Agent.objects.filter(pk__in=events, is_active=True).exclude(telegram_chat_id=""):
+        notify_agent(agent, "📋 <b>Restoranlaringiz bo'yicha eslatma</b>\n\n" + "\n\n".join(events[agent.pk]))
 
 
 # ── Balans ─────────────────────────────────────────────────────────────

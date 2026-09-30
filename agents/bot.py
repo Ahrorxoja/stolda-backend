@@ -18,6 +18,7 @@ import logging
 import re
 
 from django.db import transaction
+from django.utils import timezone
 
 from menu import qr as qr_codes
 from menu.phones import is_valid_phone, normalize_phone
@@ -172,7 +173,8 @@ def _guest_welcome(bot, chat_id: str) -> None:
         "<b>stolda.uz</b> — restoran va kafelar uchun QR menyu. Agent sifatida restoranlarni "
         "ulaysiz va ularning har to'lovidan daromad olasiz:\n\n"
         f"• restoranning <b>birinchi to'lovidan {field('first_percent').default}%</b> — oylik yoki yillik\n"
-        f"• <b>keyingi to'lovlaridan {field('percent').default}%</b> — {field('months').default} oy davomida\n"
+        f"• <b>keyingi to'lovlaridan {field('percent').default}%</b> — "
+        f"{services.duration(field('months').default)}\n"
         "• pulni istalgan vaqtda kartaga yechib olasiz\n\n"
         f"Agent bo'lish uchun «{BTN_APPLY}» ni bosing — 1 daqiqa.",
         keyboard=[[BTN_APPLY]],
@@ -315,9 +317,26 @@ def _restaurants(bot, agent: Agent) -> None:
     for restaurant in restaurants:
         subscription = getattr(restaurant, "subscription", None)
         status = STATUS_LABELS.get(subscription.status if subscription else "", "—")
+        next_date = _next_date(subscription)
+        if next_date:
+            status += f" ({next_date})"
         total = earned.get(restaurant.pk, 0)
         lines.append(f"• <b>{restaurant.name}</b> — {status}" + (f" · {services.money(total)}" if total else ""))
     bot.send(agent.telegram_chat_id, "\n".join(lines), keyboard=KEYBOARD)
+
+
+def _next_date(subscription) -> str:
+    """Restoran ro'yxatida — qachongacha to'langan / sinov / imtiyoz."""
+    if subscription is None:
+        return ""
+    when, label = {
+        "trialing": (subscription.trial_ends_at, "gacha"),
+        "active": (subscription.current_period_end, "gacha to'langan"),
+        "past_due": (subscription.grace_ends_at, "gacha to'lashi kerak"),
+    }.get(subscription.status, (None, ""))
+    if not when:
+        return ""
+    return f"{timezone.localtime(when).strftime('%d.%m')} {label}"
 
 
 def _withdraw(bot, agent: Agent) -> None:
@@ -353,8 +372,11 @@ def _help(bot, agent: Agent) -> None:
         agent.telegram_chat_id,
         f"<b>Qanday ishlaydi</b>\n\n"
         f"1. «{BTN_LINK}» — havolangiz va QR. Restoran egasi shu orqali ro'yxatdan o'tadi.\n"
-        f"2. Restoran 14–21 kunlik sinovdan keyin to'lasa — sizga daromad yoziladi.\n"
-        f"3. Balans {services.money(services.MIN_WITHDRAWAL)} dan oshsa — «{BTN_WITHDRAW}».\n\n"
+        f"2. Restoran sinovdan keyin to'lasa — birinchi to'lovidan {agent.first_percent}%, "
+        f"keyingilaridan {agent.percent}% ({services.duration(agent.months)}).\n"
+        f"3. To'lov yaqinlashganda yoki kechiksa bot eslatadi — restoranga qo'ng'iroq qilib "
+        f"eslatib qo'ying. Restoran to'lab tursa, siz ham har oy daromad olasiz.\n"
+        f"4. Balans {services.money(services.MIN_WITHDRAWAL)} dan oshsa — «{BTN_WITHDRAW}».\n\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,
     )

@@ -175,6 +175,16 @@ def process_subscriptions() -> dict:
     stats = {"reminded": 0, "past_due": 0, "suspended": 0}
     #: Kun oxirida platforma egasiga bitta umumiy xabar bo'lib boradi.
     digest: list[str] = []
+    #: Agentlarga ham — faqat o'z restoranlari haqida (`agents.services`).
+    agent_events: dict[int, list[str]] = {}
+
+    def tell_agent(subscription: Subscription, kind: str, when=None) -> None:
+        if subscription.restaurant.agent_id:
+            from agents.services import reminder_line
+
+            agent_events.setdefault(subscription.restaurant.agent_id, []).append(
+                reminder_line(subscription, kind, when)
+            )
 
     active_like = Subscription.objects.select_related("restaurant", "plan").filter(
         status__in=[
@@ -194,6 +204,7 @@ def process_subscriptions() -> dict:
                 # Spec: "menyu darhol to'xtaydi" — 60s keshni kutmaydi.
                 bump_menu_version(subscription.restaurant.slug)
                 digest.append(f"⛔️ {_label(subscription)} — menyu to'xtatildi")
+                tell_agent(subscription, "suspended")
                 stats["suspended"] += 1
             else:
                 days = (subscription.grace_ends_at - now).days + 1
@@ -220,6 +231,8 @@ def process_subscriptions() -> dict:
         if end_date.date() == reminder_date:
             logger.info("Eslatma: %s uchun muddat 3 kundan keyin", subscription.restaurant.slug)
             digest.append(f"🔔 {_label(subscription)} — 3 kundan keyin tugaydi")
+            trial = subscription.status == Subscription.Status.TRIALING
+            tell_agent(subscription, "trial_soon" if trial else "due_soon", end_date)
             stats["reminded"] += 1
         elif end_date <= now:
             subscription.status = Subscription.Status.PAST_DUE
@@ -228,9 +241,13 @@ def process_subscriptions() -> dict:
             digest.append(
                 f"💳 {_label(subscription)} — muddat tugadi, 7 kun imtiyoz berildi"
             )
+            tell_agent(subscription, "past_due")
             stats["past_due"] += 1
 
     _send_digest(digest, today)
+    from agents.services import remind_agents
+
+    remind_agents(agent_events)
     return stats
 
 

@@ -57,8 +57,12 @@ class Agent(models.Model):
 
     # Shartlar — hammaga bir xil sukut, kerak bo'lsa agentga alohida.
     percent = models.PositiveSmallIntegerField("Keyingi to'lovlardan, %", default=20)
+    #: 0 — cheksiz: agent faol ekan, restoran to'lagan har oydan. Faolligi
+    #: o'chirilsa (ishdan ketdi, mas'uliyatsizlik) — yangi daromad to'xtaydi.
     months = models.PositiveSmallIntegerField(
-        "Necha oy davomida", default=12, help_text="Keyingi to'lovlar — restoranning birinchi to'lovidan boshlab shuncha oy."
+        "Necha oy davomida",
+        default=0,
+        help_text="0 — cheksiz (agent faol ekan). Aks holda birinchi to'lovdan boshlab shuncha oy.",
     )
     #: Restoranning birinchi to'lovidan (oylik yoki yillik — farqi yo'q).
     first_percent = models.PositiveSmallIntegerField("Birinchi to'lovdan, %", default=50)
