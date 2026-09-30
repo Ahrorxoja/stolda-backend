@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>stolda.uz — Agent qo'llanmasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F7F2EC; --surface: #FFFCF8; --tint: #F4E8D4; --line: #EADFD2;
+    --ink: #231C17; --ink2: #4A3F37; --muted: #7A6E64; --subtle: #A2968B;
+    --amber: #C4902A; --amber-dark: #9E7018; --footer: #2A211B;
+  }
+  @page { size: A4; margin: 14mm 15mm 16mm; }
+  @page :first { margin: 0; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: Rubik, sans-serif; color: var(--ink); font-size: 9.9pt; line-height: 1.5; background: #fff; }
+  h1, h2, h3 { font-family: "Playfair Display", serif; font-weight: 500; margin: 0; }
+  h2 { font-size: 21pt; line-height: 1.15; margin-bottom: 3mm; }
+  h2 em, h1 em { color: var(--amber); font-style: italic; }
+  h3 { font-family: Rubik, sans-serif; font-weight: 600; font-size: 11pt; margin: 4mm 0 1.5mm; }
+  p { margin: 0 0 2.6mm; }
+  .muted { color: var(--muted); }
+  .section { break-before: page; }
+  .num { display: inline-block; font-family: Rubik; font-weight: 600; font-size: 9pt; letter-spacing: 1.6px; color: var(--amber-dark); text-transform: uppercase; margin-bottom: 2mm; }
+  .lead { font-size: 10.8pt; color: var(--ink2); margin-bottom: 3.5mm; }
+
+  /* Muqova */
+  .cover { height: 297mm; background: var(--cream); padding: 26mm 22mm; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .cover .brand { display: flex; align-items: center; gap: 4mm; font-family: "Playfair Display"; font-size: 20pt; }
+  .cover .brand img { width: 15mm; height: 15mm; border-radius: 3.5mm; }
+  .cover .brand span { color: var(--amber); }
+  .cover h1 { font-size: 50pt; line-height: 1.05; margin-top: 40mm; }
+  .cover .sub { font-size: 13pt; color: var(--ink2); margin-top: 7mm; max-width: 130mm; }
+  .cover .big-logo { position: absolute; right: 22mm; bottom: 44mm; width: 78mm; opacity: .95; border-radius: 16mm; box-shadow: 0 24px 60px -24px rgba(90,60,25,.28); }
+  .cover .foot { margin-top: auto; color: var(--muted); font-size: 10pt; display: flex; gap: 10mm; }
+  .cover .foot b { color: var(--ink); font-weight: 600; }
+
+  /* Bloklar */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 5mm; padding: 4mm 5mm; margin: 2.5mm 0; break-inside: avoid; }
+  .tint { background: var(--tint); border-color: #E9D6B4; }
+  .note { background: var(--cream); border-left: 3px solid var(--amber); border-radius: 2mm; padding: 3mm 4.5mm; margin: 2.5mm 0; break-inside: avoid; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; }
+  .stat { background: var(--cream); border-radius: 4mm; padding: 4mm 5mm; break-inside: avoid; }
+  .stat .v { font-size: 20pt; font-weight: 600; line-height: 1.1; }
+  .stat .v.amber { color: var(--amber-dark); }
+  .stat .l { font-size: 9.2pt; color: var(--muted); margin-top: 1mm; }
+
+  ol.steps { list-style: none; padding: 0; margin: 2mm 0; counter-reset: s; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 0 0 2.4mm 11mm; break-inside: avoid; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: .2mm; width: 7mm; height: 7mm; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 600; font-size: 9pt; display: flex; align-items: center; justify-content: center; }
+  ol.steps > li b { font-weight: 600; }
+  ul { margin: 1mm 0 2.5mm; padding-left: 5mm; }
+  ul li { margin-bottom: .8mm; }
+  ul.check, ul.cross { list-style: none; padding-left: 0; }
+  ul.check li, ul.cross li { padding-left: 6.5mm; position: relative; }
+  ul.check li::before { content: "✓"; position: absolute; left: 0; color: var(--amber-dark); font-weight: 700; }
+  ul.cross li::before { content: "✕"; position: absolute; left: 0; color: var(--ink2); font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 3mm; font-size: 10pt; }
+  tr { break-inside: avoid; }
+  table.tight td { padding: 1.5mm 3mm; }
+  thead, tr:first-child { break-after: avoid; }
+  th { text-align: left; font-weight: 500; font-size: 8.8pt; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; padding: 2mm 3mm; border-bottom: 1px solid var(--line); }
+  td { padding: 2mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.btn { white-space: nowrap; font-weight: 500; }
+  .kbd { display: inline-block; background: var(--surface); border: 1px solid var(--line); border-radius: 2mm; padding: .2mm 2mm; font-weight: 500; white-space: nowrap; }
+  code { font-family: Rubik; font-weight: 500; background: var(--tint); border-radius: 1.5mm; padding: 0 1.5mm; color: var(--amber-dark); }
+
+  .chat { background: var(--cream); border-radius: 5mm; padding: 5mm; break-inside: avoid; }
+  .bubble { background: var(--surface); border: 1px solid var(--line); border-radius: 4mm 4mm 4mm 1mm; padding: 2.4mm 3.5mm; margin-bottom: 2mm; max-width: 92%; }
+  .bubble.me { background: var(--tint); border-color: #E9D6B4; margin-left: auto; border-radius: 4mm 4mm 1mm 4mm; }
+  .bubble .who { font-size: 8.5pt; color: var(--muted); margin-bottom: .6mm; }
+
+  .qa { break-inside: avoid; margin-bottom: 2.6mm; }
+  .qa .q { font-weight: 600; }
+  .qa .a { color: var(--ink2); }
+
+  .kb { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1.6mm; background: var(--cream); padding: 3mm; border-radius: 4mm; margin: 3mm 0; break-inside: avoid; }
+  .kb div { background: var(--surface); border: 1px solid var(--line); border-radius: 2mm; text-align: center; padding: 1.3mm 1mm; font-size: 9.2pt; font-weight: 500; grid-column: span 3; }
+  .kb div.s2 { grid-column: span 2; }
+
+  .end { background: var(--footer); color: #F4E8D4; border-radius: 6mm; padding: 8mm 9mm; margin-top: 6mm; break-inside: avoid; }
+  .end h3 { color: #fff; font-family: "Playfair Display"; font-weight: 500; font-size: 17pt; margin: 0 0 3mm; }
+  .end a, .end b { color: #E4C98F; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<!-- ───────────── Muqova ───────────── -->
+<div class="cover">
+  <div class="brand"><img src="logo.jpg" alt=""><div>stolda<span>.uz</span></div></div>
+  <h1>Agent<br><em>qo'llanmasi</em></h1>
+  <div class="sub">Restoran va kafelarga QR menyuni tanishtirish, ulash va har oy daromad olish — boshidan oxirigacha.</div>
+  <img class="big-logo" src="logo.jpg" alt="">
+  <div class="foot">
+    <div>Bot<br><b>@Stolda_agent_bot</b></div>
+    <div>Savollar<br><b>@aha_daragoy</b></div>
+    <div>Telefon<br><b>+998 93 323 13 20</b></div>
+    <div>Versiya<br><b>Sentabr 2026</b></div>
+  </div>
+</div>
+
+<!-- ───────────── 1. stolda.uz nima ───────────── -->
+<div class="section" style="break-before: auto">
+  <span class="num">1 · Mahsulot</span>
+  <h2>stolda.uz nima va <em>nimasi yo'q</em></h2>
+  <p class="lead">stolda.uz — restoran va kafelar uchun QR menyu. Mijoz stoldagi QR kodni telefon kamerasi bilan skanerlaydi va restoran menyusini brauzerda ko'radi: rasmlar, narxlar, tarkibi, og'irligi. Ilova o'rnatish shart emas.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Restoran nima oladi</h3>
+      <ul class="check">
+        <li>Rasmli, chiroyli menyu — telefon uchun moslangan</li>
+        <li>Menyu bir necha tilda: o'zbek, rus, ingliz va yana 6 til. Tarjimani sun'iy intellekt qiladi</li>
+        <li>Narx yoki taom o'zgarsa — darhol yangilanadi, qayta chop etish kerak emas</li>
+        <li>Tayyor QR shablonlar: stol uchun kartochka, A4, A6, PNG</li>
+        <li>Statistika: qaysi taom necha marta ko'rilgan, QR necha marta skanerlangan</li>
+        <li>Taomni vaqtincha yashirish (tugagan bo'lsa) — bir tugma</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Nimasi yo'q (bu muhim!)</h3>
+      <ul class="cross">
+        <li>Onlayn buyurtma, savat, to'lov yo'q</li>
+        <li>"Ofitsiantni chaqirish" tugmasi yo'q</li>
+        <li>Sharhlar, reyting yo'q</li>
+      </ul>
+      <p class="muted" style="margin-top:3mm">Mijoz menyuni ko'radi, buyurtmani esa odatdagidek ofitsiantga aytadi. Restoranning ish tartibi o'zgarmaydi — shuning uchun egalar tez rozi bo'ladi.</p>
+    </div>
+  </div>
+
+  <h3>Narxlar</h3>
+  <div class="grid3">
+    <div class="stat"><div class="v">Bepul</div><div class="l">sinov: agent kodi bilan <b>21 kun</b> (odatda 14 kun)</div></div>
+    <div class="stat"><div class="v amber">99 000 so'm</div><div class="l">oyiga</div></div>
+    <div class="stat"><div class="v amber">990 000 so'm</div><div class="l">yiliga — 2 oy bepul chiqadi</div></div>
+  </div>
+  <p class="muted" style="margin-top:2mm">Sinov uchun karta kerak emas. Restoran to'lamasa, sinovdan keyin menyu shunchaki to'xtaydi.</p>
+
+  <div class="note"><b>Namunani ko'rsating:</b> <code>stolda.uz/demo</code> — tayyor restoran menyusi. Suhbatni shu bilan boshlash eng oson: egasi o'z telefonida ochib ko'radi.</div>
+</div>
+
+<!-- ───────────── 2. Agent bo'lish ───────────── -->
+<div class="section">
+  <span class="num">2 · Boshlash</span>
+  <h2>Qanday qilib <em>agent bo'lasiz</em></h2>
+  <p class="lead">Hammasi Telegram bot orqali. Ro'yxatdan o'tish 3–4 daqiqa oladi.</p>
+
+  <ol class="steps">
+    <li><b>Botni oching:</b> Telegram'da <b>@Stolda_agent_bot</b> ni toping va <span class="kbd">/start</span> bosing.</li>
+    <li><b><span class="kbd">📝 Agent bo'lish</span></b> tugmasini bosing — bot agent qoidalarini ko'rsatadi. Diqqat bilan o'qing.</li>
+    <li><b><span class="kbd">✅ Qoidalarga roziman</span></b> — shundan keyin ariza boshlanadi.</li>
+    <li><b>Ariza (4 savol):</b>
+      <ul>
+        <li>Ism-familiya</li>
+        <li>Telefon raqami — <span class="kbd">📱 Raqamni yuborish</span> tugmasi bilan yoki qo'lda: <code>+998 90 123 45 67</code></li>
+        <li>Viloyat — 14 ta hududdan tanlanadi</li>
+        <li>Restoran egalari bilan tanishlaringiz bormi — ixtiyoriy, "O'tkazib yuborish" mumkin</li>
+      </ul>
+    </li>
+    <li><b>Kutish:</b> bot "⏳ Arizangiz ko'rib chiqilmoqda" deydi. stolda.uz arizani ko'rib chiqadi va javob shu botga keladi.</li>
+    <li><b>Tasdiqlandi!</b> Sizga shaxsiy <b>agent kodi</b> va <b>havola</b> beriladi. Pastda asosiy tugmalar paydo bo'ladi — ish boshlandi.</li>
+  </ol>
+
+  <div class="note">Qoidalar o'zgarsa, bot yangi qoidalarni ko'rsatadi va qayta rozilik so'raydi. Rozi bo'lmaguncha tugmalar ishlamaydi. Qoidalarni istalgan vaqt <span class="kbd">📜 Qoidalar</span> tugmasi bilan ko'rish mumkin.</div>
+
+  <h3>Havola va kod — sizning "hamyoningiz"</h3>
+  <p>Restoran sizning <b>havolangiz</b> yoki <b>kodingiz</b> bilan ro'yxatdan o'tsa, u sizga biriktiriladi va uning to'lovlaridan daromad olasiz.</p>
+  <table>
+    <tr><th style="width:32%">Nima</th><th>Qanday ishlaydi</th></tr>
+    <tr><td class="btn">🔗 Havola va QR</td><td><span class="kbd">🔗 Havolam</span> bosing — bot havola (<code>stolda.uz/signup?agent=KOD</code>) va QR rasm yuboradi. Restoran egasi QR'ni skanerlasa, darhol ro'yxatdan o'tish sahifasi ochiladi va kod <b>o'zi yoziladi</b>.</td></tr>
+    <tr><td class="btn">🔑 Agent kodi</td><td>Egasi havolasiz, o'zi <code>stolda.uz</code> orqali kirsa — ro'yxatdan o'tishda <b>"Agent kodi"</b> maydoniga kodingizni yozadi. To'g'ri bo'lsa, ismingiz ko'rinadi.</td></tr>
+    <tr><td class="btn">⏱ 30 kun</td><td>Egasi havolani ochib, ro'yxatdan keyinroq o'tsa ham — kod o'sha telefonda 30 kun eslab qolinadi.</td></tr>
+  </table>
+  <div class="note"><b>Eng ishonchlisi:</b> ro'yxatdan o'tishni egasining yonida, uning telefonida, sizning QR'ingiz orqali qiling. Kod keyin faqat sinov muddati ichida va faqat stolda.uz orqali qo'shilishi mumkin.</div>
+</div>
+
+<!-- ───────────── 3. Daromad ───────────── -->
+<div class="section">
+  <span class="num">3 · Daromad</span>
+  <h2>Qancha <em>topasiz</em></h2>
+  <p class="lead">Siz olib kelgan restoran to'lagan har bir haqiqiy to'lovdan ulush olasiz.</p>
+
+  <div class="grid2">
+    <div class="stat tint" style="background:var(--tint)"><div class="v amber">50%</div><div class="l"><b>birinchi to'lovdan</b> — oylik bo'ladimi yoki yillik, farqi yo'q</div></div>
+    <div class="stat"><div class="v">20%</div><div class="l"><b>keyingi har bir to'lovdan</b> — siz faol agent ekansiz va restoran to'lashda davom etar ekan</div></div>
+  </div>
+
+  <h3>Misollar</h3>
+  <table>
+    <tr><th>Holat</th><th>Birinchi to'lov</th><th>Keyingi to'lovlar</th></tr>
+    <tr><td>Restoran oylik to'laydi (99 000)</td><td><b>49 500 so'm</b></td><td>har oy <b>19 800 so'm</b></td></tr>
+    <tr><td>Restoran yillik to'laydi (990 000)</td><td><b>495 000 so'm</b></td><td>har yili <b>198 000 so'm</b></td></tr>
+    <tr><td>10 ta restoran, hammasi oylik</td><td>jami <b>495 000 so'm</b></td><td>har oy <b>198 000 so'm</b></td></tr>
+    <tr><td>30 ta restoran, hammasi oylik</td><td>jami <b>1 485 000 so'm</b></td><td>har oy <b>594 000 so'm</b></td></tr>
+  </table>
+  <p class="muted">Restoranlar ko'paygani sari har oylik daromadingiz o'sib boradi — bu "bir martalik bonus" emas, doimiy daromad.</p>
+
+  <h3>Muhim shartlar</h3>
+  <ul>
+    <li>Daromad faqat stolda.uz tasdiqlagan <b>haqiqiy to'lovdan</b> yoziladi. Bepul sinov uchun daromad yo'q.</li>
+    <li>Restoran sizning havolangiz yoki kodingiz bilan kelgan bo'lishi kerak.</li>
+    <li>20% ulush <b>siz faol ekansiz</b> davom etadi. Restoranlaringiz bilan aloqani uzsangiz, ishni tashlasangiz yoki qoidani buzsangiz, faolligingiz o'chirilishi va restoranlaringiz boshqa agentga o'tkazilishi mumkin. Oldin topgan balansingiz baribir sizniki — yechib olasiz.</li>
+    <li>To'lov tasdiqlanishi bilan bot sizga xabar yuboradi: qaysi restoran, qancha yozildi.</li>
+  </ul>
+</div>
+
+<!-- ───────────── 4. Bot tugmalari ───────────── -->
+<div class="section">
+  <span class="num">4 · Bot</span>
+  <h2>Botning <em>tugmalari</em></h2>
+  <p class="lead">Tasdiqlangandan keyin pastda shu tugmalar turadi. Xuddi shu ishlarni Telegram'dagi "Menu" dagi buyruqlar bilan ham qilish mumkin.</p>
+
+  <p class="muted" style="margin-top:-1mm"><code>/start</code> — botni qaytadan boshlash (tugmalar yo'qolsa ham). Istalgan bosqichda <span class="kbd">❌ Bekor qilish</span> yoki boshqa tugma bossangiz — boshlangan ish bekor bo'ladi.</p>
+
+
+  <div class="kb">
+    <div>➕ Borgan joyim</div><div>📒 Borgan joylarim</div>
+    <div>🔍 Qidirish</div><div>🗺 Barcha joylar</div>
+    <div>🤝 Hamkorlarimiz</div><div>🍽 Restoranlarim</div>
+    <div class="s2">🔗 Havolam</div><div class="s2">💰 Balans</div><div class="s2">💸 Pul yechish</div>
+    <div class="s2">💳 Karta</div><div class="s2">📜 Qoidalar</div><div class="s2">❓ Yordam</div>
+  </div>
+
+  <table class="tight">
+    <tr><th style="width:30%">Tugma</th><th style="width:15%">Buyruq</th><th>Nima qiladi</th></tr>
+    <tr><td class="btn">➕ Borgan joyim</td><td>/joy</td><td>Borgan joyingizni yozasiz: viloyat, nomi, manzili, natija, izoh. <b>Har bir borgan joyni yozing.</b></td></tr>
+    <tr><td class="btn">📒 Borgan joylarim</td><td>/joylarim</td><td>O'zingiz borgan joylar: oxirgi natija, qachon, izohingiz, band bo'lsa necha kun qolgani.</td></tr>
+    <tr><td class="btn">🔍 Qidirish</td><td>/qidirish</td><td>Borishdan oldin tekshirish: bu joyga kimdir borganmi, nima bo'lgan, u stolda.uz mijozimi.</td></tr>
+    <tr><td class="btn">🗺 Barcha joylar</td><td>/joylar</td><td>Viloyatdagi <b>hamma agentlar</b> borgan joylar — oxirgi natija va kim borgani bilan.</td></tr>
+    <tr><td class="btn">🤝 Hamkorlarimiz</td><td>/hamkorlar</td><td>stolda.uz'dan foydalanayotgan restoranlar ro'yxati — viloyat bo'yicha yoki hammasi. Ularga bormang.</td></tr>
+    <tr><td class="btn">🍽 Restoranlarim</td><td>/restoranlar</td><td>Siz ulagan restoranlar: holati (🟡 sinovda, 🟢 to'layapti, 🟠 to'lov kutilmoqda, 🔴 to'xtatilgan), keyingi to'lov sanasi va har biridan topganingiz.</td></tr>
+    <tr><td class="btn">🔗 Havolam</td><td>/havola</td><td>Shaxsiy havolangiz, kodingiz va QR rasm — restoran egasiga ko'rsatish uchun.</td></tr>
+    <tr><td class="btn">💰 Balans</td><td>/balans</td><td>Yechish mumkin bo'lgan summa, so'rovdagi, o'tkazilgan va shu oy topilgan pul.</td></tr>
+    <tr><td class="btn">💸 Pul yechish</td><td>/yechish</td><td>Balansdagi pulni kartangizga o'tkazishni so'rash.</td></tr>
+    <tr><td class="btn">💳 Karta</td><td>/karta</td><td>Pul tushadigan kartani saqlash yoki almashtirish.</td></tr>
+    <tr><td class="btn">📜 Qoidalar</td><td>/qoidalar</td><td>Agent qoidalarining to'liq matni.</td></tr>
+    <tr><td class="btn">❓ Yordam</td><td>/yordam</td><td>Qisqa eslatma: qanday ishlaydi.</td></tr>
+  </table>
+</div>
+
+<!-- ───────────── 5. Jurnal ───────────── -->
+<div class="section">
+  <span class="num">5 · Joylar jurnali</span>
+  <h2>Bir joyga ikki agent <em>bormasligi</em> uchun</h2>
+  <p class="lead">Borgan joylar jurnalini hamma agentlar ko'radi. Shu tufayli siz behuda yo'l yurmaysiz va boshqalarning tajribasidan foydalanasiz.</p>
+
+  <h3>Har kuni shu tartibda ishlang</h3>
+  <ol class="steps">
+    <li><b>Borishdan oldin</b> — <span class="kbd">🔍 Qidirish</span>: viloyatni tanlang va restoran nomini yozing (bir qismi ham bo'ladi, masalan <code>rayh</code>).</li>
+    <li><b>Natijaga qarang:</b>
+      <ul>
+        <li>🟢 <b>stolda.uz mijozi</b> — bormang, u allaqachon biz bilan.</li>
+        <li>🟡 <b>boshqa agent bilan ishlanmoqda</b> — bormang, joy band (necha kun qolgani yozilgan).</li>
+        <li>Oldingi tashriflar va izohlar — masalan "Boshqa QR menyusi bor" yoki "Egasi dushanba bo'ladi". Shunga qarab qaror qiling.</li>
+        <li>"Hali hech kim bormagan" — bemalol boring ✅</li>
+      </ul>
+    </li>
+    <li><b>Borgandan keyin darhol</b> — <span class="kbd">➕ Borgan joyim</span>:
+      <ul>
+        <li>Viloyat → restoran nomi <b>lotin harflarida</b> (masalan <code>Oqtepa Lavash</code>) → manzil yoki mo'ljal (<code>Chilonzor 9-kvartal, bozor yonida</code>)</li>
+        <li>Shu nomli joy bor bo'lsa, bot manzillarini ko'rsatadi — o'shani tanlang yoki "Boshqa manzil (yangi joy)" — boshqa filial bo'lsa.</li>
+        <li>Natija va izoh (izoh ixtiyoriy, lekin juda foydali).</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>Natijalar va ularning ma'nosi</h3>
+  <table>
+    <tr><th style="width:36%">Natija</th><th>Qachon tanlanadi</th></tr>
+    <tr><td class="btn">🤝 Qiziqdi, qayta boraman</td><td>Egasi qiziqdi, lekin hali ulanmadi. <b>Joy 14 kunga sizga band bo'ladi</b> — boshqa agentlar 🟡 belgisini ko'radi.</td></tr>
+    <tr><td class="btn">✅ Ulandi</td><td>Restoran ro'yxatdan o'tdi. Agar restoran viloyatini to'g'ri ko'rsatib, kodingiz bilan o'tsa — bu yozuv <b>avtomatik</b> qo'shiladi.</td></tr>
+    <tr><td class="btn">📱 Boshqa QR menyusi bor</td><td>Restoranda boshqa kompaniyaning QR menyusi bor.</td></tr>
+    <tr><td class="btn">❌ Rad etdi</td><td>Egasi rozi bo'lmadi. Sababini izohga yozing — keyingi agentga foydali.</td></tr>
+    <tr><td class="btn">🚪 Egasi yo'q edi</td><td>Qaror qiladigan odamni topa olmadingiz.</td></tr>
+  </table>
+
+  <div class="note"><b>Band muddati:</b> "Qiziqdi" dan keyin 14 kun ichida qayta boring va ulang. 14 kun o'tsa, band o'z-o'zidan tushadi va boshqa agent borishi mumkin. Qayta borib yana "Qiziqdi" yozsangiz — yana 14 kun.</div>
+  <p class="muted">Jurnalda boshqa agentlar faqat ismingizni ko'radi. Familiya, telefon, karta va balans hech kimga ko'rinmaydi.</p>
+</div>
+
+<!-- ───────────── 6. Restoranni ulash ───────────── -->
+<div class="section">
+  <span class="num">6 · Ulash</span>
+  <h2>Restoranni <em>ulash</em> — qadamma-qadam</h2>
+  <p class="lead">Egasi rozi bo'ldi. Endi hammasini shu yerning o'zida, 5–10 daqiqada qiling.</p>
+
+  <ol class="steps">
+    <li><b>QR'ingizni ko'rsating.</b> <span class="kbd">🔗 Havolam</span> dagi QR'ni egasi o'z telefoni kamerasi bilan skanerlaydi — ro'yxatdan o'tish sahifasi ochiladi.</li>
+    <li><b>Google bilan kirish.</b> Egasi o'z Google (Gmail) hisobini tanlaydi. Parol o'ylab topish kerak emas. <b>Maslahat:</b> egasining o'z shaxsiy pochtasi bo'lsin — xodimniki emas.</li>
+    <li><b>Restoran ma'lumotlari:</b> nomi, menyu manzili (<code>stolda.uz/nomi</code> — bo'sh ekanini sayt o'zi tekshiradi), telefon, <b>viloyat</b>. Pastdagi <b>"Agent kodi"</b> maydonida kodingiz va ismingiz turganini tekshiring ✓.</li>
+    <li><b>Menyu tillari:</b> qaysi tillarda ko'rsatish va asosiy til. Masalan: o'zbek (asosiy) + rus + ingliz. Tarjimani sun'iy intellekt o'zi qiladi.</li>
+    <li><b>Tayyor!</b> Sahifada restoranning QR kodi chiqadi. Bepul sinov (21 kun) boshlandi.</li>
+  </ol>
+
+  <h3>Keyin — menyuni to'ldirishga yordam bering</h3>
+  <ul>
+    <li><b>Kategoriyalar:</b> Nonushta, Birinchi taomlar, Salatlar, Ichimliklar va h.k. — ikonka yoki rasm bilan.</li>
+    <li><b>Taomlar:</b> rasm (telefonda olingan rasm ham bo'ladi), nomi, tavsifi, tarkibi, narxi, og'irligi. Asosiy tilda yoziladi — boshqa tillarga o'zi tarjima qilinadi.</li>
+    <li><b>Belgilar:</b> "Mashhur" va "Vegetarian" — mijozlarga tanlashni osonlashtiradi.</li>
+    <li><b>QR kod bo'limi:</b> tayyor shablon tanlanadi (stol kartochkasi, A4, A6 yoki faqat QR), rang va logotip qo'yiladi, PDF yoki PNG yuklab olinadi va chop etiladi.</li>
+    <li>QR'larni har bir stolga, kirish eshigiga, kassaga qo'yishga yordam bering.</li>
+  </ul>
+
+  <div class="note"><b>Nega yordam berish kerak:</b> menyusi to'la va QR'lari stolda turgan restoran sinovdan keyin to'laydi. Bo'sh menyu bilan qolgan restoran — to'lamaydi. Sizning birinchi 50% ingiz aynan shunga bog'liq.</div>
+</div>
+
+<!-- ───────────── 7. Aloqa va eslatmalar ───────────── -->
+<div class="section">
+  <span class="num">7 · Aloqa</span>
+  <h2>Restoranlaringiz bilan <em>aloqada</em> bo'ling</h2>
+  <p class="lead">Sizning doimiy 20% ingiz restoranlar to'lab turganiga bog'liq. Bot kerakli paytda o'zi eslatadi — restoran nomi va telefoni bilan.</p>
+
+  <table>
+    <tr><th style="width:38%">Botdan xabar</th><th>Nima qilasiz</th></tr>
+    <tr><td>⏰ Bepul sinov tez orada tugaydi <span class="muted">(3 kun oldin)</span></td><td>Qo'ng'iroq qiling: menyu yoqdimi, savollar bormi, birinchi to'lovni eslating. Yillik tarif foydaliroq ekanini ayting (2 oy bepul).</td></tr>
+    <tr><td>⏰ To'lov muddati tez orada tugaydi <span class="muted">(3 kun oldin)</span></td><td>Qisqa eslatma yetarli.</td></tr>
+    <tr><td>💳 To'lov muddati o'tdi</td><td>7 kun ichida to'lasa menyu to'xtamaydi. Qo'ng'iroq qiling, sababini bilib oling.</td></tr>
+    <tr><td>⛔️ Menyu to'xtatildi</td><td>To'lasa darhol tiklanadi — hech narsa o'chmaydi. Egasiga shuni ayting.</td></tr>
+    <tr><td>✅ To'lov tasdiqlandi, daromad yozildi</td><td>Hech narsa — pul balansingizga tushdi 🙂</td></tr>
+  </table>
+
+  <h3>Restoran qanday to'laydi</h3>
+  <p>Egasi admin panelda <b>"To'lov va tarif"</b> bo'limiga kiradi, oylik yoki yillikni tanlaydi, ko'rsatilgan kartaga pul o'tkazadi va <b>chek rasmini yuklaydi</b>. stolda.uz chekni tasdiqlaydi — obuna uzayadi, sizga daromad yoziladi.</p>
+
+  <h3>Yaxshi agent odatlari</h3>
+  <ul class="check">
+    <li>Ulagandan 2–3 kun keyin qo'ng'iroq qiling: menyu to'ldimi, QR'lar stolda turibdimi?</li>
+    <li>Oyda bir marta xabar oling — yangi taom qo'shish, narx o'zgartirishda yordam kerakmi.</li>
+    <li>Egasi tizimga kira olmasa yoki savol bo'lsa — <b>@aha_daragoy</b> ga yo'naltiring.</li>
+  </ul>
+</div>
+
+<!-- ───────────── 8. Pul yechish ───────────── -->
+<div class="section">
+  <span class="num">8 · Pul</span>
+  <h2>Pulni <em>yechib olish</em></h2>
+
+  <ol class="steps">
+    <li><b><span class="kbd">💳 Karta</span></b> — 16 xonali karta raqamini yuboring (masalan <code>8600 1234 5678 9012</code>), keyin karta egasining ism-familiyasini (kartadagidek). Bir marta saqlanadi, keyin almashtirish mumkin.</li>
+    <li><b><span class="kbd">💰 Balans</span></b> — qancha yechish mumkinligini ko'ring.</li>
+    <li><b><span class="kbd">💸 Pul yechish</span></b> — balans <b>100 000 so'm</b> yoki undan ko'p bo'lsa, hammasi bir so'rov bilan yuboriladi.</li>
+    <li>Bot tasdiqlaydi: "✅ So'rov yuborildi". Pul odatda <b>1–3 ish kunida</b> kartangizga o'tkaziladi.</li>
+    <li>O'tkazilgach bot xabar beradi: "✅ … kartangizga o'tkazildi".</li>
+  </ol>
+
+  <div class="grid3">
+    <div class="stat"><div class="v amber">100 000</div><div class="l">so'mdan boshlab yechish mumkin</div></div>
+    <div class="stat"><div class="v">1–3</div><div class="l">ish kuni ichida o'tkaziladi</div></div>
+    <div class="stat"><div class="v">1 ta</div><div class="l">bir vaqtda faqat bitta so'rov</div></div>
+  </div>
+  <div class="note">Karta raqami va egasini to'g'ri kiritish — sizning mas'uliyatingiz. Faolligingiz o'chirilgan bo'lsa ham, topgan balansingizni ko'rish va yechish mumkin.</div>
+
+  <!-- ───────────── 9. Qoidalar ───────────── -->
+  <span class="num" style="margin-top:8mm">9 · Qoidalar</span>
+  <h2>Qoidalar — <em>qisqacha</em></h2>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">Qilish kerak</h3>
+      <ul class="check">
+        <li>stolda.uz haqida to'g'ri va halol gapirish</li>
+        <li>Borishdan oldin «🔍 Qidirish» bilan tekshirish</li>
+        <li>Har borgan joyni halol yozish — lotin harflarida, natija va izoh bilan</li>
+        <li>Menyu kiritish va QR chop etishda yordam berish</li>
+        <li>Restoranlaringiz bilan aloqada bo'lish</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Taqiqlanadi</h3>
+      <ul class="cross">
+        <li>🟢 mijoz yoki 🟡 band joyga borish</li>
+        <li>Yolg'on va'da: "buyurtma qabul qiladi", "abadiy bepul", "chegirma beraman"</li>
+        <li>Egasining roziligisiz yoki soxta ro'yxatdan o'tkazish</li>
+        <li>Jurnalga yolg'on yoki haqoratli yozuv</li>
+        <li>Spam, bosim, stolda.uz nomidan pul so'rash</li>
+        <li>Restoranlar ma'lumotini boshqalarga berish</li>
+      </ul>
+    </div>
+  </div>
+  <p class="muted">Soxta ro'yxat yoki aldov aniqlansa, unga tegishli daromad bekor qilinadi. Agent o'z daromadi bo'yicha soliqni O'zbekiston qonunchiligiga muvofiq o'zi to'laydi. To'liq matn: botda <span class="kbd">📜 Qoidalar</span>.</p>
+</div>
+
+<!-- ───────────── 10. Suhbat ───────────── -->
+<div class="section">
+  <span class="num">10 · Suhbat</span>
+  <h2>Restoran egasi bilan <em>suhbat</em></h2>
+  <p class="lead">Qisqa, sodda gapiring. Ko'rsatish — gapirishdan yaxshiroq.</p>
+
+  <div class="chat">
+    <div class="bubble me"><div class="who">Siz</div>Assalomu alaykum! Men stolda.uz'danman. Restoranlar uchun QR menyu qilamiz — mijoz stoldagi QR'ni skanerlaydi va menyuni rasmlari, narxlari bilan telefonida ko'radi. Bir daqiqa ko'rsatsam maylimi?</div>
+    <div class="bubble me"><div class="who">Siz — telefonda stolda.uz/demo ni ko'rsatib</div>Mana, shunday ko'rinadi. O'zbek, rus, ingliz tilida. Narx o'zgarsa — bir daqiqada o'zgartirasiz, qayta chop etish kerak emas.</div>
+    <div class="bubble"><div class="who">Egasi</div>Qancha turadi?</div>
+    <div class="bubble me"><div class="who">Siz</div>21 kun bepul sinab ko'rasiz, karta kerak emas. Keyin oyiga 99 ming yoki yiliga 990 ming — 2 oy tekin chiqadi. Hoziroq 5 daqiqada ochib beraman, menyuni kiritishga ham yordam beraman.</div>
+  </div>
+
+  <h3>Ko'p beriladigan savollar va javoblar</h3>
+  <div class="qa"><div class="q">"Buyurtma ham qabul qiladimi?"</div><div class="a">Yo'q — faqat menyu. Buyurtmani mijoz odatdagidek ofitsiantga aytadi, ish tartibingiz o'zgarmaydi. Hech qachon "buyurtma qabul qiladi" demang.</div></div>
+  <div class="qa"><div class="q">"Bizda qog'oz menyu bor-ku."</div><div class="a">Qog'oz menyu eskiradi, narx o'zgarsa qayta chop etiladi, turistlar tushunmaydi. QR menyu doim yangi, bir necha tilda va rasmli — mijoz tezroq tanlaydi.</div></div>
+  <div class="qa"><div class="q">"Bizda boshqa QR menyu bor."</div><div class="a">Farqini ko'rsating: dizayn, 9 tilgacha avtomatik tarjima, tayyor QR shablonlar, ko'rishlar statistikasi. Majburlamang — jurnalga "Boshqa QR menyusi bor" deb yozing.</div></div>
+  <div class="qa"><div class="q">"Menyuni kim kiritadi? Vaqtim yo'q."</div><div class="a">Men yordam beraman. Rasm va narxlarni bering — birga kiritamiz. Tarjimani sun'iy intellekt o'zi qiladi.</div></div>
+  <div class="qa"><div class="q">"Mijozlarda internet bo'lmasa?"</div><div class="a">Menyu juda yengil, oddiy mobil internetda tez ochiladi.</div></div>
+  <div class="qa"><div class="q">"To'lamasam nima bo'ladi?"</div><div class="a">Hech narsa — sinovdan keyin menyu shunchaki to'xtaydi. Hech qanday majburiyat yo'q. To'lasangiz, hammasi o'sha zahoti qaytadi.</div></div>
+  <div class="qa"><div class="q">"Keyin o'ylab ko'raman."</div><div class="a">Normal. QR'ingizni qoldiring yoki havolani Telegram'da yuboring (kod 30 kun eslab qolinadi). Jurnalga "🤝 Qiziqdi" yozing — joy 14 kun sizga band.</div></div>
+</div>
+
+<!-- ───────────── 11. Savollar ───────────── -->
+<div class="section">
+  <span class="num">11 · Savollar</span>
+  <h2>Agentlarning <em>savollari</em></h2>
+
+  <div class="qa"><div class="q">Restoran kodimsiz ro'yxatdan o'tib qo'ydi. Nima qilaman?</div><div class="a">Sinov muddati tugamagan bo'lsa — darhol @aha_daragoy ga yozing (restoran nomi va menyu manzili bilan). Sinovdan keyin kod qo'shilmaydi.</div></div>
+  <div class="qa"><div class="q">Band joyni boshqa agent o'z kodi bilan ulab qo'ydi.</div><div class="a">Daromad kod egasiga yoziladi, lekin stolda.uz buni avtomatik ko'radi va alohida ko'rib chiqadi. Qoidabuzarlik bo'lsa, choralar ko'riladi.</div></div>
+  <div class="qa"><div class="q">Bot "lotin harflarida yozing" deyapti.</div><div class="a">Nom va manzilni faqat lotin harflarida yozing: <code>Rayhon</code>, <code>Farg'ona choyxonasi</code>. Kirill (<code>Райхон</code>) qabul qilinmaydi — shunda hamma bir xil qidiradi.</div></div>
+  <div class="qa"><div class="q">Bir tarmoqning ikki filiali bor.</div><div class="a">Nomi bir xil, manzili boshqa — alohida joy. "Boshqa manzil (yangi joy)" ni tanlang.</div></div>
+  <div class="qa"><div class="q">Restoran egasi Google hisobiga kira olmay qoldi.</div><div class="a">@aha_daragoy ga yozsin — hisob boshqa pochtaga o'tkazib beriladi. Menyu va to'lovlar saqlanib qoladi.</div></div>
+  <div class="qa"><div class="q">Balansda pul bor, lekin "Pul yechish" ishlamayapti.</div><div class="a">Balans 100 000 so'mdan kam, karta saqlanmagan yoki oldingi so'rov hali ko'rib chiqilmoqda. <span class="kbd">💰 Balans</span> da hammasi yozilgan.</div></div>
+  <div class="qa"><div class="q">Tugmalar yo'qolib qoldi.</div><div class="a"><code>/start</code> yozing — tugmalar qaytadi.</div></div>
+
+  <div class="end">
+    <h3>Savol bo'lsa — yozing</h3>
+    Telegram: <b>@aha_daragoy</b> · Telefon: <b>+998 93 323 13 20</b><br>
+    Agent bot: <b>@Stolda_agent_bot</b> · Namuna: <b>stolda.uz/demo</b><br><br>
+    Omad! Har bir ulangan restoran — sizning doimiy daromadingiz. ✦
+  </div>
+</div>
+
+</body>
+</html>

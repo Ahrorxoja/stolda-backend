@@ -8,6 +8,7 @@ to'xtatmaydi: Telegram ishlamasa ham to'lov va hisob-kitob to'g'ri yoziladi.
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.db import transaction
@@ -87,6 +88,24 @@ def notify_agent(agent: Agent, text: str, *, main_keyboard: bool = False) -> Non
     transaction.on_commit(send)
 
 
+#: PDF qo'llanma — manbasi `agents/guide/index.html`, qayta yaratish: `render.mjs`.
+GUIDE_PATH = Path(__file__).resolve().parent / "guide" / "stolda-agent-qollanma.pdf"
+GUIDE_CAPTION = "📘 <b>Agent qo'llanmasi</b> — hammasi bir joyda: daromad, bot tugmalari, restoranni ulash, suhbat."
+
+
+def send_guide(bot, chat_id: str) -> None:
+    """Qo'llanmani PDF qilib yuboradi. Fayl bo'lmasa yoki Telegram rad etsa — jim o'tadi."""
+    try:
+        data = GUIDE_PATH.read_bytes()
+    except OSError:
+        logger.warning("Agent qo'llanmasi topilmadi: %s", GUIDE_PATH)
+        return
+    try:
+        bot.send_document(chat_id, data, "stolda-agent-qollanma.pdf", GUIDE_CAPTION)
+    except TelegramError as error:
+        logger.warning("Qo'llanma yuborilmadi: %s", error)
+
+
 # ── Ariza (agent o'zi to'ldiradi, platforma egasi tasdiqlaydi) ─────────
 
 
@@ -159,6 +178,9 @@ def approve_application(agent: Agent) -> bool:
         f"Boshlash uchun «🔗 Havolam» ni bosing.",
         main_keyboard=True,
     )
+    if fresh.telegram_chat_id:
+        chat_id = fresh.telegram_chat_id
+        transaction.on_commit(lambda: send_guide(get_agent_bot(), chat_id))
     return True
 
 

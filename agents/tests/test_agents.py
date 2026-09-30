@@ -588,9 +588,10 @@ class ApplicationTests(AgentTestCase):
         self.assertEqual(agent.code, "VALI")
         self.assertTrue(agent.is_active)
         self.assertIn("kod VALI", bot.edited[0]["text"])
-        welcome = self.agent_bot.sent[-1]
+        welcome, guide = self.agent_bot.sent[-2:]
         self.assertIn("Tabriklaymiz", welcome["text"])
         self.assertEqual(welcome["keyboard"], agent_bot.KEYBOARD)
+        self.assertEqual(guide["document"], "stolda-agent-qollanma.pdf")  # qo'llanma darhol
         # Endi agent — balansni ko'radi.
         self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
         # Qayta bosish — hech narsa o'zgarmaydi.
@@ -806,3 +807,20 @@ class MenuCommandsTests(TestCase):
 
         self.assertIn("agent qoidalari", bot.sent[0]["text"])
         self.assertEqual(bot.sent[-1]["keyboard"], agent_bot.KEYBOARD)
+
+    def test_help_sends_pdf_guide(self):
+        from agents import bot as agent_bot
+        from agents.rules import RULES_VERSION
+        from agents.services import GUIDE_PATH
+        from django.utils import timezone
+        from telegrambot import FakeChatBot
+
+        self.assertTrue(GUIDE_PATH.exists())
+        agent = Agent.objects.create(
+            name="Ali", code="ALI", telegram_chat_id="78", rules_version=RULES_VERSION, rules_accepted_at=timezone.now()
+        )
+        bot = FakeChatBot()
+        agent_bot.handle_message(bot, {"chat": {"id": agent.telegram_chat_id, "type": "private"}, "text": agent_bot.BTN_HELP})
+
+        self.assertIn("Qanday ishlaydi", bot.sent[0]["text"])
+        self.assertEqual(bot.sent[1]["document"], "stolda-agent-qollanma.pdf")

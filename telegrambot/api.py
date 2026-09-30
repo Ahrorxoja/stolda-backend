@@ -188,6 +188,15 @@ class TelegramChatBot(TelegramBot):
         )
         return str(result.get("message_id", ""))
 
+    def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
+        result = self._call(
+            "sendDocument",
+            data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+            files={"document": (filename, data, "application/pdf")},
+            timeout=60,
+        )
+        return str(result.get("message_id", ""))
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         self._call(
             "setMyCommands",

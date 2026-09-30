@@ -58,6 +58,10 @@ class ChatBot(Protocol):
         """PNG rasm (masalan agentning QR vizitkasi)."""
         ...
 
+    def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
+        """Fayl (masalan PDF qo'llanma)."""
+        ...
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         """Telegram'dagi "Menu" ro'yxati: `[("start", "Boshlash"), ...]`."""
         ...

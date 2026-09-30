@@ -714,10 +714,11 @@ def _help(bot, agent: Agent) -> None:
         f"tekshiring: 🟢 mijoz yoki 🟡 band joyga bormang.\n"
         f"6. «{BTN_MY_VISITS}» — o'zingiz borgan joylar, «{BTN_PLACES}» — hamma agentlar borgan joylar, "
         f"«{BTN_PARTNERS}» — stolda.uz'dan foydalanayotgan restoranlar.\n\n"
-        f"To'liq qoidalar: /qoidalar\n"
+        f"To'liq qoidalar: «{BTN_RULES}»\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,
     )
+    services.send_guide(bot, agent.telegram_chat_id)
 
 
 def _rules(bot, agent: Agent) -> None:

@@ -67,6 +67,11 @@ class FakeChatBot:
     def get_updates(self, offset: int, timeout: int) -> list[dict]:
         return []
 
+    def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
+        message_id = str(next(self._ids))
+        self.sent.append({"chat_id": str(chat_id), "document": filename, "caption": caption})
+        return message_id
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         self.commands = list(commands)
 
