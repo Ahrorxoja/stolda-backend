@@ -67,6 +67,11 @@ class FakeChatBot:
     def get_updates(self, offset: int, timeout: int) -> list[dict]:
         return []
 
+    def send_web_app(self, chat_id: str, text: str, label: str, url: str) -> str:
+        message_id = str(next(self._ids))
+        self.sent.append({"chat_id": str(chat_id), "text": text, "web_app": {"label": label, "url": url}})
+        return message_id
+
     def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
         message_id = str(next(self._ids))
         self.sent.append({"chat_id": str(chat_id), "document": filename, "caption": caption})

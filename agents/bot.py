@@ -47,11 +47,16 @@ BTN_PARTNERS = "🤝 Hamkorlarimiz"
 BTN_APP = "📱 Ilovani ochish"
 
 
+def _app_url() -> str:
+    """Mini App manzili — Telegram faqat HTTPS'ni qabul qiladi (localda bo'sh)."""
+    return f"{settings.SITE_URL}/agent" if settings.SITE_URL.startswith("https://") else ""
+
+
 def _app_row() -> list[list]:
-    """Mini App tugmasi — Telegram faqat HTTPS manzilni qabul qiladi (localda yo'q)."""
-    if not settings.SITE_URL.startswith("https://"):
-        return []
-    return [[{"text": BTN_APP, "web_app": {"url": f"{settings.SITE_URL}/agent"}}]]
+    # Oddiy matn tugma: pastdagi klaviaturadan ochilgan Mini App'ga Telegram
+    # agent ma'lumotini (`initData`) bermaydi — shuning uchun bot xabar ostida
+    # (inline) "Ochish" tugmasini yuboradi, ilova o'shandan ochiladi.
+    return [[BTN_APP]] if _app_url() else []
 
 
 KEYBOARD = _app_row() + [
@@ -733,6 +738,20 @@ def _help(bot, agent: Agent) -> None:
     services.send_guide(bot, agent.telegram_chat_id)
 
 
+def _app(bot, agent: Agent) -> None:
+    url = _app_url()
+    if not url:
+        bot.send(agent.telegram_chat_id, "Ilova hozircha ishlamayapti.", keyboard=KEYBOARD)
+        return
+    bot.send_web_app(
+        agent.telegram_chat_id,
+        "📱 <b>stolda.uz agent ilovasi</b>\n\nJoy yozish, jurnal, restoranlaringiz va daromad — bitta joyda. "
+        "Pastdagi tugmani bosing 👇",
+        "📱 Ilovani ochish",
+        url,
+    )
+
+
 def _rules(bot, agent: Agent) -> None:
     _show_rules(bot, agent.telegram_chat_id, KEYBOARD)
 
@@ -750,8 +769,9 @@ _BUTTONS = {
     BTN_CARD: _card,
     BTN_HELP: _help,
     BTN_RULES: _rules,
+    BTN_APP: _app,
 }
-_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help, _my_visits, _rules}
+_ALLOWED_WHEN_INACTIVE = {_balance, _withdraw, _card, _help, _my_visits, _rules, _app}
 
 _COMMANDS = {
     "/joy": _visit,
@@ -766,12 +786,14 @@ _COMMANDS = {
     "/karta": _card,
     "/yordam": _help,
     "/qoidalar": _rules,
+    "/ilova": _app,
     "/help": _help,
 }
 
 #: Telegram'dagi "Menu" tugmasi — bot ishga tushganda o'rnatiladi (`agent_bot`).
 MENU_COMMANDS = [
     ("start", "Boshlash"),
+    ("ilova", "Agent ilovasini ochish"),
     ("joy", "Borgan joyimni yozish"),
     ("joylarim", "Borgan joylarim"),
     ("qidirish", "Joyni qidirish"),

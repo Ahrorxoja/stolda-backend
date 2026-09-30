@@ -58,6 +58,10 @@ class ChatBot(Protocol):
         """PNG rasm (masalan agentning QR vizitkasi)."""
         ...
 
+    def send_web_app(self, chat_id: str, text: str, label: str, url: str) -> str:
+        """Xabar ostida Mini App tugmasi (inline) — faqat shunda Telegram ilovaga `initData` beradi."""
+        ...
+
     def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
         """Fayl (masalan PDF qo'llanma)."""
         ...

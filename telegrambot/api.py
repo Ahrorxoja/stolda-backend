@@ -188,6 +188,18 @@ class TelegramChatBot(TelegramBot):
         )
         return str(result.get("message_id", ""))
 
+    def send_web_app(self, chat_id: str, text: str, label: str, url: str) -> str:
+        result = self._call(
+            "sendMessage",
+            data={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": json.dumps({"inline_keyboard": [[{"text": label, "web_app": {"url": url}}]]}),
+            },
+        )
+        return str(result.get("message_id", ""))
+
     def send_document(self, chat_id: str, data: bytes, filename: str, caption: str = "") -> str:
         result = self._call(
             "sendDocument",

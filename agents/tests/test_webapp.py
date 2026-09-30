@@ -152,3 +152,17 @@ class AgentAppTests(AgentTestCase):
         self.assertEqual(len(earnings["months"]), 6)
         self.assertEqual(earnings["months"][-1]["amount"], 150_000)
         self.assertEqual(earnings["withdrawals"][0]["status"], "pending")
+
+
+@override_settings(SITE_URL="https://stolda.uz")
+class AppButtonTests(AgentTestCase):
+    def test_app_button_sends_inline_web_app_button(self):
+        from agents import bot as agent_bot
+        from telegrambot import FakeChatBot
+
+        agent = make_agent(name="Ali", code="ALI", telegram_chat_id="201")
+        bot = FakeChatBot()
+        agent_bot.handle_message(bot, {"chat": {"id": "201", "type": "private"}, "text": agent_bot.BTN_APP})
+
+        self.assertEqual(bot.sent[-1]["web_app"]["url"], "https://stolda.uz/agent")
+        self.assertEqual(agent.pk, agent_bot.Agent.objects.get(telegram_chat_id="201").pk)
