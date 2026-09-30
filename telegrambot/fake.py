@@ -77,6 +77,9 @@ class FakeChatBot:
         self.sent.append({"chat_id": str(chat_id), "document": filename, "caption": caption})
         return message_id
 
+    def set_menu_app(self, label: str, url: str) -> None:
+        self.menu_app = (label, url)
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         self.commands = list(commands)
 

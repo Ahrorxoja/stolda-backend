@@ -66,6 +66,10 @@ class ChatBot(Protocol):
         """Fayl (masalan PDF qo'llanma)."""
         ...
 
+    def set_menu_app(self, label: str, url: str) -> None:
+        """Yozish maydoni yonidagi menyu tugmasi — Mini App'ni ochadi (hamma chatlar uchun)."""
+        ...
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         """Telegram'dagi "Menu" ro'yxati: `[("start", "Boshlash"), ...]`."""
         ...

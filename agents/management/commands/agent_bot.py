@@ -9,7 +9,7 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from agents.bot import MENU_COMMANDS, handle_message
+from agents.bot import MENU_APP_LABEL, MENU_COMMANDS, _app_url, handle_message
 from telegrambot import TelegramError, get_agent_bot
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,12 @@ class Command(BaseCommand):
         offset = 0
         try:
             bot.set_commands(MENU_COMMANDS)
+            # Yozish maydoni yonidagi tugma — ilova bir bosishda ochiladi
+            # (buyruqlar ro'yxati "/" yozilganda baribir chiqadi).
+            if _app_url():
+                bot.set_menu_app(MENU_APP_LABEL, _app_url())
         except TelegramError as error:
-            logger.warning("Buyruqlar ro'yxati o'rnatilmadi: %s", error)
+            logger.warning("Buyruqlar yoki menyu tugmasi o'rnatilmadi: %s", error)
         self.stdout.write("Agentlar boti ishga tushdi…")
 
         while True:

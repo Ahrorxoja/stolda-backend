@@ -209,6 +209,12 @@ class TelegramChatBot(TelegramBot):
         )
         return str(result.get("message_id", ""))
 
+    def set_menu_app(self, label: str, url: str) -> None:
+        self._call(
+            "setChatMenuButton",
+            data={"menu_button": json.dumps({"type": "web_app", "text": label, "web_app": {"url": url}})},
+        )
+
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         self._call(
             "setMyCommands",

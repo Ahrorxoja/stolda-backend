@@ -47,6 +47,9 @@ BTN_PARTNERS = "🤝 Hamkorlarimiz"
 BTN_APP = "📱 Ilovani ochish"
 
 
+MENU_APP_LABEL = "Ilova"
+
+
 def _app_url() -> str:
     """Mini App manzili — Telegram faqat HTTPS'ni qabul qiladi (localda bo'sh)."""
     return f"{settings.SITE_URL}/agent" if settings.SITE_URL.startswith("https://") else ""
