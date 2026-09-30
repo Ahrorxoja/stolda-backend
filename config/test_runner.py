@@ -15,6 +15,7 @@ class StoldaTestRunner(DiscoverRunner):
         settings.GEMINI_API_KEY = ""
         settings.TELEGRAM_BOT_TOKEN = ""
         settings.TELEGRAM_ADMIN_CHAT_ID = ""
+        settings.AGENT_BOT_TOKEN = ""
         # Throttle hisobi keshda turadi va testlar orasida tozalanmaydi —
         # o'chirmasak, ketma-ket kirish testlari bir-birini yiqitadi.
         # Cheklovning o'zi `test_throttling.py` da alohida tekshiriladi.

@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "menu",
+    "agents",
 ]
 
 MIDDLEWARE = [
@@ -130,6 +131,8 @@ REST_FRAMEWORK = {
         "receipt": "10/hour",
         # Ro'yxatdan o'tish va Google orqali kirish.
         "signup": "20/hour",
+        # Agent kodini tekshirish — kodlarni tanlab ko'rishga qarshi.
+        "agent_check": "30/hour",
     },
 }
 
@@ -195,6 +198,11 @@ PAYMENT_CARD_HOLDER = os.getenv("PAYMENT_CARD_HOLDER", "")
 # so'rov yuborilmaydi.
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
+#: Agentlar boti — cheklar botidan alohida (agentlar sizning shaxsiy
+#: chatingiz bilan aralashmasin). Bo'sh bo'lsa xabarlar yuborilmaydi.
+AGENT_BOT_TOKEN = os.getenv("AGENT_BOT_TOKEN", "")
+#: `t.me/<username>?start=<taklif>` havolasi uchun, `@` siz.
+AGENT_BOT_USERNAME = os.getenv("AGENT_BOT_USERNAME", "").lstrip("@")
 
 # Yuklanadigan rasm hajmi chegarasi (8 MB).
 DATA_UPLOAD_MAX_MEMORY_SIZE = 8 * 1024 * 1024

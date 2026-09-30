@@ -192,6 +192,17 @@ class Restaurant(models.Model):
     is_listed = models.BooleanField("Qidiruvda ko'rinsin", default=True)
     #: 14 kunlik sinov bir marta beriladi — shu maydon shuni belgilaydi.
     trial_used_at = models.DateTimeField(null=True, blank=True)
+    #: Qaysi savdo agenti olib kelgan (`agents` ilovasi). Birinchi to'lovdan
+    #: keyin faqat Django admin'da o'zgartiriladi.
+    agent = models.ForeignKey(
+        "agents.Agent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="restaurants",
+        verbose_name="Agent",
+    )
+    agent_attached_at = models.DateTimeField(null=True, blank=True, editable=False)
     translation_meta = models.JSONField(
         default=dict, validators=[validate_translation_meta], blank=True
     )

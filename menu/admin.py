@@ -23,10 +23,11 @@ class RestaurantAdmin(admin.ModelAdmin):
         "subscription_status",
         "owner_contact",
         "owner_telegram",
+        "agent",
         "is_active",
         "dish_count",
     )
-    list_filter = ("is_active",)
+    list_filter = ("is_active", "agent")
     search_fields = (
         "name",
         "slug",

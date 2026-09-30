@@ -1,8 +1,8 @@
 from django.conf import settings
 
-from .api import TelegramBot
-from .base import Bot
-from .fake import FakeBot
+from .api import TelegramBot, TelegramChatBot
+from .base import Bot, ChatBot
+from .fake import FakeBot, FakeChatBot
 
 
 def get_bot() -> Bot:
@@ -17,3 +17,9 @@ def get_bot() -> Bot:
     if not token or not chat_id:
         return FakeBot()
     return TelegramBot(token, chat_id)
+
+
+def get_agent_bot() -> ChatBot:
+    """Agentlar boti. `AGENT_BOT_TOKEN` bo'lmasa `FakeChatBot` — tarmoqqa chiqmaydi."""
+    token = getattr(settings, "AGENT_BOT_TOKEN", "")
+    return TelegramChatBot(token) if token else FakeChatBot()

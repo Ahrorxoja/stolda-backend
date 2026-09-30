@@ -5,9 +5,19 @@ shunda dev muhitida va testlarda tashqi so'rov bo'lmaydi (`translation/`
 paketi bilan bir xil naqsh).
 """
 
-from .api import TelegramBot
-from .base import Bot, TelegramError
-from .factory import get_bot
-from .fake import FakeBot
+from .api import TelegramBot, TelegramChatBot
+from .base import Bot, ChatBot, TelegramError
+from .factory import get_agent_bot, get_bot
+from .fake import FakeBot, FakeChatBot
 
-__all__ = ["Bot", "FakeBot", "TelegramBot", "TelegramError", "get_bot"]
+__all__ = [
+    "Bot",
+    "ChatBot",
+    "FakeBot",
+    "FakeChatBot",
+    "TelegramBot",
+    "TelegramChatBot",
+    "TelegramError",
+    "get_agent_bot",
+    "get_bot",
+]

@@ -67,6 +67,11 @@ def record_payment(
         # Spec: to'lovdan keyin menyu DARHOL tiklanadi — 60s keshni kutmaydi.
         bump_menu_version(subscription.restaurant.slug)
 
+    # Restoranni agent olib kelgan bo'lsa — uning ulushi (`agents` ilovasi).
+    from agents.services import on_invoice_paid
+
+    on_invoice_paid(invoice)
+
     return invoice
 
 

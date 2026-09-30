@@ -46,6 +46,8 @@ services:
       PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER}
       PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER}
       SITE_URL: ${SITE_URL:-https://stolda.uz}
+      AGENT_BOT_TOKEN: ${AGENT_BOT_TOKEN:-}
+      AGENT_BOT_USERNAME: ${AGENT_BOT_USERNAME:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
       MEDIA_ROOT: /srv/media
@@ -83,6 +85,8 @@ services:
       PAYMENT_CARD_NUMBER: ${PAYMENT_CARD_NUMBER}
       PAYMENT_CARD_HOLDER: ${PAYMENT_CARD_HOLDER}
       SITE_URL: ${SITE_URL:-https://stolda.uz}
+      AGENT_BOT_TOKEN: ${AGENT_BOT_TOKEN:-}
+      AGENT_BOT_USERNAME: ${AGENT_BOT_USERNAME:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID}
       MEDIA_ROOT: /srv/media
@@ -108,6 +112,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  # Agentlar boti: havola, balans, pul yechish so'rovi (long polling).
+  # AGENT_BOT_TOKEN bo'sh bo'lsa ishga tushmay, qayta urinib turadi — shuning
+  # uchun `profiles` bilan faqat token qo'yilgandan keyin yoqiladi.
+  agent_bot:
+    build:
+      context: ../
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    command: python manage.py agent_bot
+    environment: *worker_env
+    profiles: ["agents"]
+    depends_on:
+      db:
+        condition: service_healthy
 
   # To'lov cheklarini tasdiqlash tugmalarini tinglaydi (long polling).
   bot:

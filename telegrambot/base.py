@@ -31,6 +31,30 @@ class Bot(Protocol):
         """Yechim qabul qilingach xabarni yangilaydi va tugmalarni olib tashlaydi."""
         ...
 
+    def send_buttons(self, text: str, buttons: list[tuple[str, str]]) -> str:
+        """Matnli xabar + bir qator tugma (`(yozuv, callback_data)`), `message_id`."""
+        ...
+
+    def edit_text(self, message_id: str, text: str) -> None:
+        """Matnli xabarni yangilaydi va tugmalarni olib tashlaydi."""
+        ...
+
     def get_updates(self, offset: int, timeout: int) -> list[dict]:
         """Uzun so'rov (long polling) — kelgan yangilanishlar."""
+        ...
+
+
+class ChatBot(Protocol):
+    """Ko'p foydalanuvchili bot (agentlar) — har xabar kimga ekani aniq beriladi."""
+
+    def send(self, chat_id: str, text: str, keyboard: list[list[str]] | None = None) -> str:
+        """Xabar; `keyboard` — pastdagi doimiy tugmalar (qatorlar bo'yicha)."""
+        ...
+
+    def send_photo(self, chat_id: str, image: bytes, caption: str = "") -> str:
+        """PNG rasm (masalan agentning QR vizitkasi)."""
+        ...
+
+    def get_updates(self, offset: int, timeout: int) -> list[dict]:
+        """Kelgan xabarlar (long polling)."""
         ...

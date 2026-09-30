@@ -38,6 +38,8 @@ from .models import (
     Subscription,
     ViewKind,
 )
+from agents import services as agent_services
+
 from . import qr as qr_codes
 from . import qr_print
 from .deletion import delete_restaurant, deletion_summary
@@ -108,6 +110,10 @@ class RestaurantViewSet(viewsets.ModelViewSet):
                 }
             )
 
+        agent = self._agent_from_request()
+        # Agent kodi bilan kelganga sinov uzunroq — egasi kodni kiritishdan manfaatdor.
+        trial_days = agent_services.AGENT_TRIAL_DAYS if agent else self.TRIAL_DAYS
+
         now = timezone.now()
         with transaction.atomic():
             # A'zolik `signals.ensure_owner_membership` da beriladi.
@@ -116,8 +122,20 @@ class RestaurantViewSet(viewsets.ModelViewSet):
                 restaurant=restaurant,
                 plan=Plan.objects.get(code="standard"),
                 status=Subscription.Status.TRIALING,
-                trial_ends_at=now + timedelta(days=self.TRIAL_DAYS),
+                trial_ends_at=now + timedelta(days=trial_days),
             )
+            if agent:
+                agent_services.attach(restaurant, agent)
+
+    def _agent_from_request(self):
+        """Ixtiyoriy `agent_code`. Bo'sh — agentsiz; noto'g'ri — xato (haqqi yo'qolmasin)."""
+        code = str(self.request.data.get("agent_code", "") or "").strip()
+        if not code:
+            return None
+        agent = agent_services.find_agent(code)
+        if agent is None:
+            raise ValidationError({"agent_code": "Bunday agent kodi topilmadi. Tekshirib qayta yozing."})
+        return agent
 
     def destroy(self, request, *args, **kwargs):
         """Restoranni butunlay o'chiradi — faqat egasi, nomini tasdiqlab.
@@ -145,7 +163,13 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         before = set(serializer.instance.languages or [])
+        # Ro'yxatdan o'tishda orqaga qaytib kodni keyin yozgan bo'lsa ham —
+        # faqat hali agent yo'q va sinovda bo'lsa (to'lagandan keyin — admin orqali).
+        agent = self._agent_from_request()
         restaurant = serializer.save()
+        subscription = getattr(restaurant, "subscription", None)
+        if agent and not restaurant.agent_id and subscription and subscription.status == Subscription.Status.TRIALING:
+            agent_services.attach(restaurant, agent)
         # Yangi til qo'shilgan bo'lsa, menyudagi hamma matnni tarjima qilamiz.
         if set(restaurant.languages or []) - before:
             transaction.on_commit(lambda: retranslate_restaurant.delay(restaurant.pk))
