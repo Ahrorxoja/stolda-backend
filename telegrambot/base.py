@@ -58,6 +58,10 @@ class ChatBot(Protocol):
         """PNG rasm (masalan agentning QR vizitkasi)."""
         ...
 
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        """Telegram'dagi "Menu" ro'yxati: `[("start", "Boshlash"), ...]`."""
+        ...
+
     def get_updates(self, offset: int, timeout: int) -> list[dict]:
         """Kelgan xabarlar (long polling)."""
         ...

@@ -750,6 +750,23 @@ _COMMANDS = {
     "/help": _help,
 }
 
+#: Telegram'dagi "Menu" tugmasi — bot ishga tushganda o'rnatiladi (`agent_bot`).
+MENU_COMMANDS = [
+    ("start", "Boshlash"),
+    ("joy", "Borgan joyimni yozish"),
+    ("joylarim", "Borgan joylarim"),
+    ("qidirish", "Joyni qidirish"),
+    ("joylar", "Barcha joylar"),
+    ("hamkorlar", "Hamkorlarimiz"),
+    ("havola", "Havolam va QR vizitka"),
+    ("balans", "Balans"),
+    ("restoranlar", "Restoranlarim"),
+    ("yechish", "Pul yechish"),
+    ("karta", "Kartani saqlash"),
+    ("yordam", "Qanday ishlaydi"),
+    ("qoidalar", "Agent qoidalari"),
+]
+
 
 # ── Karta kiritish ─────────────────────────────────────────────────────
 

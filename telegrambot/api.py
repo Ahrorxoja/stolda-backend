@@ -188,6 +188,12 @@ class TelegramChatBot(TelegramBot):
         )
         return str(result.get("message_id", ""))
 
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        self._call(
+            "setMyCommands",
+            data={"commands": json.dumps([{"command": c, "description": d} for c, d in commands])},
+        )
+
     def get_updates(self, offset: int, timeout: int = 25) -> list[dict]:
         result = self._call(
             "getUpdates",

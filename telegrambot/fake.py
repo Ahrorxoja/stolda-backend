@@ -67,5 +67,8 @@ class FakeChatBot:
     def get_updates(self, offset: int, timeout: int) -> list[dict]:
         return []
 
+    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+        self.commands = list(commands)
+
     def texts(self, chat_id: str) -> list[str]:
         return [item.get("text") or item.get("caption", "") for item in self.sent if item["chat_id"] == str(chat_id)]

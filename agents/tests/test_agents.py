@@ -780,3 +780,14 @@ class RulesTests(AgentTestCase):
         self.assertIn("Aloqa", last["text"])
         self.assertEqual(last["keyboard"], agent_bot.KEYBOARD)
 
+
+
+class MenuCommandsTests(TestCase):
+    def test_every_menu_command_is_handled(self):
+        from agents import bot as agent_bot
+
+        names = [name for name, _ in agent_bot.MENU_COMMANDS]
+        self.assertEqual(names[0], "start")
+        for name in names[1:]:
+            with self.subTest(name=name):
+                self.assertIn(f"/{name}", agent_bot._COMMANDS)
