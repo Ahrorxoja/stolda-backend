@@ -3,9 +3,14 @@
 Har bir kelgan xabar `handle_message` ga beriladi — Telegram'ning o'ziga
 bog'liq emas, shuning uchun testda `FakeChatBot` bilan to'liq tekshiriladi.
 
-Agent botga faqat shaxsiy taklif havolasi orqali ulanadi
-(`t.me/<bot>?start=<invite_token>`) — kodni bilgan begona odam
-boshqaning balansini ko'ra olmaydi.
+Agent bo'lishning ikki yo'li:
+- **Ariza** — istalgan odam botda "Agent bo'lish" ni bosib ism, telefon
+  (Telegram tasdiqlagan), shahar va tanishlari haqida yozadi; platforma
+  egasi cheklar botida "Qabul / Rad" ni bosadi, qabul qilinsa kod beriladi.
+- **Taklif havolasi** — Django admin'da qo'lda qo'shilgan agent uchun
+  (`t.me/<bot>?start=<invite_token>`), bitta Telegram hisobiga bog'lanadi.
+
+Balans va boshqa ma'lumot faqat o'sha agentning chatida ko'rinadi.
 """
 
 import io
@@ -15,6 +20,7 @@ import re
 from django.db import transaction
 
 from menu import qr as qr_codes
+from menu.phones import is_valid_phone, normalize_phone
 
 from . import services
 from .models import Agent, AgentEarning
@@ -33,6 +39,17 @@ KEYBOARD = [[BTN_LINK, BTN_BALANCE], [BTN_RESTAURANTS, BTN_WITHDRAW], [BTN_CARD,
 STATE_CARD_NUMBER = "card_number"
 STATE_CARD_HOLDER = "card_holder"
 
+BTN_APPLY = "📝 Agent bo'lish"
+BTN_SKIP = "O'tkazib yuborish"
+BTN_CONTACT = {"text": "📱 Raqamni yuborish", "request_contact": True}
+CITY_KEYBOARD = [["Toshkent", "Samarqand"], ["Buxoro", "Farg'ona"], ["Andijon", "Namangan"]]
+
+STATE_APPLY_NAME = "apply_name"
+STATE_APPLY_PHONE = "apply_phone"
+STATE_APPLY_CITY = "apply_city"
+STATE_APPLY_NOTE = "apply_note"
+APPLY_STATES = {STATE_APPLY_NAME, STATE_APPLY_PHONE, STATE_APPLY_CITY, STATE_APPLY_NOTE}
+
 SUPPORT = "@aha_daragoy"
 
 STATUS_LABELS = {
@@ -50,20 +67,33 @@ def handle_message(bot, message: dict) -> None:
         return  # Guruhlarda ishlamaydi — balans shaxsiy ma'lumot.
     chat_id = str(chat.get("id", ""))
     text = (message.get("text") or "").strip()
-    if not chat_id or not text:
+    contact = message.get("contact")
+    sender = message.get("from") or {}
+    if not chat_id or not (text or contact):
         return
 
     if text.startswith("/start"):
         token = text.split(maxsplit=1)[1].strip() if " " in text else ""
-        _start(bot, chat_id, token, message.get("from") or {})
+        _start(bot, chat_id, token, sender)
         return
 
     agent = Agent.objects.filter(telegram_chat_id=chat_id).first()
     if agent is None:
-        bot.send(
-            chat_id,
-            "Bu bot stolda.uz agentlari uchun. Agent bo'lish uchun bizga yozing: " + SUPPORT,
-        )
+        if text == BTN_APPLY:
+            _begin_application(bot, chat_id, sender)
+        else:
+            _guest_welcome(bot, chat_id)
+        return
+    if agent.bot_state in APPLY_STATES:
+        _continue_application(bot, agent, text, contact, sender)
+        return
+    if agent.rejected_at:
+        bot.send(chat_id, _REJECTED, keyboard=[])
+        return
+    if agent.is_pending:
+        bot.send(chat_id, _PENDING, keyboard=[])
+        return
+    if not text:
         return
     # Karta kiritish bosqichi — tugma bosilsa bosqich bekor bo'ladi.
     if agent.bot_state and text not in _BUTTONS:
@@ -106,11 +136,16 @@ def _start(bot, chat_id: str, token: str, sender: dict) -> None:
             agent = candidate
 
     if agent is None:
-        bot.send(
-            chat_id,
-            "Assalomu alaykum! Bu bot stolda.uz agentlari uchun.\n"
-            "Agent bo'lish uchun bizga yozing: " + SUPPORT,
-        )
+        _guest_welcome(bot, chat_id)
+        return
+    if agent.bot_state in APPLY_STATES:
+        _ask_next(bot, agent)
+        return
+    if agent.rejected_at:
+        bot.send(chat_id, _REJECTED, keyboard=[])
+        return
+    if agent.is_pending:
+        bot.send(chat_id, _PENDING, keyboard=[])
         return
 
     bot.send(
@@ -123,6 +158,108 @@ def _start(bot, chat_id: str, token: str, sender: dict) -> None:
         f"Boshlash uchun «{BTN_LINK}» ni bosing.",
         keyboard=KEYBOARD,
     )
+
+
+# ── Ariza ──────────────────────────────────────────────────────────────
+
+_PENDING = "⏳ Arizangiz ko'rib chiqilmoqda. Javob shu yerga keladi."
+_REJECTED = "Arizangiz ko'rib chiqilgan, afsuski hozircha qabul qila olmaymiz. Savollar: " + SUPPORT
+
+
+def _guest_welcome(bot, chat_id: str) -> None:
+    field = Agent._meta.get_field
+    bot.send(
+        chat_id,
+        "Assalomu alaykum! 👋\n\n"
+        "<b>stolda.uz</b> — restoran va kafelar uchun QR menyu. Agent sifatida restoranlarni "
+        "ulaysiz va ularning har to'lovidan daromad olasiz:\n\n"
+        f"• har to'lovdan <b>{field('percent').default}%</b> — {field('months').default} oy davomida\n"
+        f"• birinchi to'lov uchun <b>{services.money(field('first_bonus').default)}</b> bonus\n"
+        "• pulni istalgan vaqtda kartaga yechib olasiz\n\n"
+        f"Agent bo'lish uchun «{BTN_APPLY}» ni bosing — 1 daqiqa.",
+        keyboard=[[BTN_APPLY]],
+    )
+
+
+def _begin_application(bot, chat_id: str, sender: dict) -> None:
+    agent = Agent.objects.create(
+        name="",
+        is_active=False,
+        telegram_chat_id=chat_id,
+        telegram_username=(sender.get("username") or "")[:64],
+        bot_state=STATE_APPLY_NAME,
+    )
+    _ask_next(bot, agent)
+
+
+def _ask_next(bot, agent: Agent) -> None:
+    """Joriy bosqichning savoli (bot qayta ochilsa ham shu yerdan davom etadi)."""
+    chat_id = agent.telegram_chat_id
+    if agent.bot_state == STATE_APPLY_NAME:
+        bot.send(chat_id, "1/4. Ism-familiyangizni yozing:", keyboard=[])
+    elif agent.bot_state == STATE_APPLY_PHONE:
+        bot.send(
+            chat_id,
+            "2/4. Telefon raqamingizni yuboring — pastdagi tugmani bosing 👇",
+            keyboard=[[BTN_CONTACT]],
+        )
+    elif agent.bot_state == STATE_APPLY_CITY:
+        bot.send(chat_id, "3/4. Qaysi shahardasiz? Tanlang yoki yozing:", keyboard=CITY_KEYBOARD)
+    elif agent.bot_state == STATE_APPLY_NOTE:
+        bot.send(
+            chat_id,
+            "4/4. Restoran yoki kafe egalari bilan tanishlaringiz bormi? Qisqacha yozing "
+            "(masalan: «5–6 ta tanish restoran bor»).",
+            keyboard=[[BTN_SKIP]],
+        )
+
+
+def _continue_application(bot, agent: Agent, text: str, contact: dict | None, sender: dict) -> None:
+    chat_id = agent.telegram_chat_id
+    state = agent.bot_state
+
+    if state == STATE_APPLY_NAME:
+        name = " ".join(text.split())[:80]
+        if len(name) < 3 or name.startswith("/"):
+            bot.send(chat_id, "Ism-familiyani to'liq yozing:")
+            return
+        agent.name, agent.bot_state = name, STATE_APPLY_PHONE
+
+    elif state == STATE_APPLY_PHONE:
+        if contact:
+            # Faqat o'z raqami — boshqaning kontaktini yuborib bo'lmasin.
+            if contact.get("user_id") and sender.get("id") and contact["user_id"] != sender["id"]:
+                bot.send(chat_id, "Iltimos, o'zingizning raqamingizni yuboring 👇", keyboard=[[BTN_CONTACT]])
+                return
+            phone = normalize_phone(contact.get("phone_number", ""))
+        elif is_valid_phone(text):
+            phone = normalize_phone(text)
+        else:
+            bot.send(chat_id, "Pastdagi «📱 Raqamni yuborish» tugmasini bosing 👇", keyboard=[[BTN_CONTACT]])
+            return
+        agent.phone, agent.bot_state = phone[:20], STATE_APPLY_CITY
+
+    elif state == STATE_APPLY_CITY:
+        city = " ".join(text.split())[:60]
+        if len(city) < 2:
+            bot.send(chat_id, "Shahar nomini yozing:", keyboard=CITY_KEYBOARD)
+            return
+        agent.city, agent.bot_state = city, STATE_APPLY_NOTE
+
+    elif state == STATE_APPLY_NOTE:
+        agent.note = "" if text == BTN_SKIP else " ".join(text.split())[:300]
+        agent.bot_state = ""
+        agent.save(update_fields=["name", "phone", "city", "note", "bot_state"])
+        services.submit_application(agent)
+        bot.send(
+            chat_id,
+            "✅ Arizangiz yuborildi! Tez orada ko'rib chiqamiz — javob shu yerga keladi.",
+            keyboard=[],
+        )
+        return
+
+    agent.save(update_fields=["name", "phone", "city", "note", "bot_state"])
+    _ask_next(bot, agent)
 
 
 # ── Tugmalar ───────────────────────────────────────────────────────────

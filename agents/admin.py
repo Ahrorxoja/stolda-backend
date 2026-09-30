@@ -6,11 +6,27 @@ from . import services
 from .models import Agent, AgentEarning, AgentWithdrawal
 
 
+class ApplicationFilter(admin.SimpleListFilter):
+    title = "ariza"
+    parameter_name = "ariza"
+
+    def lookups(self, request, model_admin):
+        return (("pending", "⏳ Kutilmoqda"), ("rejected", "Rad etilgan"))
+
+    def queryset(self, request, queryset):
+        if self.value() == "pending":
+            return queryset.filter(applied_at__isnull=False, approved_at__isnull=True, rejected_at__isnull=True)
+        if self.value() == "rejected":
+            return queryset.filter(rejected_at__isnull=False)
+        return queryset
+
+
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "code",
+        "state",
         "telegram",
         "restaurants_count",
         "paying_count",
@@ -18,11 +34,13 @@ class AgentAdmin(admin.ModelAdmin):
         "paid_total",
         "is_active",
     )
-    list_filter = ("is_active",)
-    search_fields = ("name", "code", "phone", "telegram_username")
-    readonly_fields = ("links", "telegram", "balance_info", "created_at")
+    list_filter = ("is_active", ApplicationFilter)
+    search_fields = ("name", "code", "phone", "telegram_username", "city")
+    readonly_fields = ("links", "telegram", "balance_info", "created_at", "applied_at", "approved_at", "rejected_at")
+    actions = ("approve", "reject")
     fieldsets = (
-        (None, {"fields": ("name", "phone", "code", "is_active")}),
+        (None, {"fields": ("name", "phone", "city", "code", "is_active")}),
+        ("Ariza", {"fields": ("note", "applied_at", "approved_at", "rejected_at")}),
         ("Havolalar", {"fields": ("links", "telegram")}),
         ("Shartlar", {"fields": ("percent", "months", "first_bonus")}),
         ("Karta", {"fields": ("card_number", "card_holder")}),
@@ -42,6 +60,24 @@ class AgentAdmin(admin.ModelAdmin):
                 ),
             )
         )
+
+    @admin.display(description="holati")
+    def state(self, obj: Agent) -> str:
+        if obj.is_pending:
+            return "⏳ ariza"
+        if obj.rejected_at:
+            return "rad etilgan"
+        return "faol" if obj.is_active else "o'chirilgan"
+
+    @admin.action(description="✅ Arizani qabul qilish (kod beriladi)")
+    def approve(self, request, queryset):
+        done = sum(services.approve_application(agent) for agent in queryset)
+        self.message_user(request, f"{done} ta ariza qabul qilindi.", messages.SUCCESS)
+
+    @admin.action(description="❌ Arizani rad etish")
+    def reject(self, request, queryset):
+        done = sum(services.reject_application(agent) for agent in queryset)
+        self.message_user(request, f"{done} ta ariza rad etildi.", messages.WARNING)
 
     @admin.display(description="restoranlar", ordering="_restaurants")
     def restaurants_count(self, obj: Agent) -> int:

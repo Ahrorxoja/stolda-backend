@@ -12,8 +12,8 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from agents.models import AgentWithdrawal
-from agents.services import settle_withdrawal
+from agents.models import Agent, AgentWithdrawal
+from agents.services import approve_application, reject_application, settle_withdrawal
 from menu.billing_ledger import approve_receipt, reject_receipt
 from menu.models import PaymentReceipt
 from telegrambot import TelegramError, get_bot
@@ -62,6 +62,9 @@ class Command(BaseCommand):
         if action in ("wd_paid", "wd_reject"):
             self._handle_withdrawal(bot, callback, action, raw_id)
             return
+        if action in ("ag_ok", "ag_no"):
+            self._handle_application(bot, callback, action, raw_id)
+            return
 
         receipt = PaymentReceipt.objects.filter(pk=raw_id or 0).first()
         if receipt is None:
@@ -100,6 +103,32 @@ class Command(BaseCommand):
             text = "Bu so'rov allaqachon ko'rib chiqilgan."
         else:
             text = "✅ O'tkazildi" if paid else "❌ Rad etildi"
+        self._answer(bot, callback, text)
+
+        message = callback.get("message", {})
+        message_id = str(message.get("message_id", ""))
+        if message_id and done:
+            try:
+                bot.edit_text(message_id, f"{message.get('text', '')}\n\n<b>{text}</b>")
+            except TelegramError as error:
+                logger.warning("Xabarni yangilab bo'lmadi: %s", error)
+
+    def _handle_application(self, bot, callback: dict, action: str, raw_id: str) -> None:
+        """Agent arizasi: "Qabul qilish" yoki "Rad etish"."""
+        agent = Agent.objects.filter(pk=raw_id if raw_id.isdigit() else 0).first()
+        if agent is None:
+            self._answer(bot, callback, "Ariza topilmadi.")
+            return
+
+        approve = action == "ag_ok"
+        done = approve_application(agent) if approve else reject_application(agent)
+        if not done:
+            text = "Bu ariza allaqachon ko'rib chiqilgan."
+        elif approve:
+            agent.refresh_from_db()
+            text = f"✅ Qabul qilindi — kod {agent.code}"
+        else:
+            text = "❌ Rad etildi"
         self._answer(bot, callback, text)
 
         message = callback.get("message", {})

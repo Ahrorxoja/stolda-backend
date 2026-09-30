@@ -53,19 +53,117 @@ def find_agent(code: str) -> Agent | None:
 # ── Xabarlar ───────────────────────────────────────────────────────────
 
 
-def notify_agent(agent: Agent, text: str) -> None:
-    """Agentga xabar — tranzaksiyadan keyin, xatosi yutiladi."""
+def notify_agent(agent: Agent, text: str, *, main_keyboard: bool = False) -> None:
+    """Agentga xabar — tranzaksiyadan keyin, xatosi yutiladi.
+
+    `main_keyboard` — pastdagi asosiy tugmalarni ham yuborish (qabul qilinganda).
+    """
     if not agent.telegram_chat_id:
         return
     chat_id = agent.telegram_chat_id
 
     def send():
+        from .bot import KEYBOARD  # bot.py services'ni import qiladi — aylanma import bo'lmasin
+
         try:
-            get_agent_bot().send(chat_id, text)
+            get_agent_bot().send(chat_id, text, keyboard=KEYBOARD if main_keyboard else None)
         except TelegramError as error:
             logger.warning("Agentga xabar yuborilmadi (%s): %s", agent.code, error)
 
     transaction.on_commit(send)
+
+
+# ── Ariza (agent o'zi to'ldiradi, platforma egasi tasdiqlaydi) ─────────
+
+
+# Kirill ismlardan ham kod chiqsin: "Алишер" → "ALISHER".
+_CYRILLIC = str.maketrans(
+    {
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo", "ж": "j",
+        "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
+        "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "x", "ц": "ts",
+        "ч": "ch", "ш": "sh", "щ": "sh", "ъ": "", "ы": "i", "ь": "", "э": "e", "ю": "yu",
+        "я": "ya", "ў": "o", "қ": "q", "ғ": "g", "ҳ": "h",
+    }
+)
+
+
+def generate_code(name: str) -> str:
+    """Ismdan oson eslanadigan kod: "Ali Valiyev" → `ALI`, band bo'lsa `ALI2`, `ALI3`…"""
+    first = (name.split() or [""])[0].lower().translate(_CYRILLIC)
+    base = normalize_code(first)[:8]
+    if len(base) < 3:
+        base = (base + "AGENT")[:5]
+    candidate, number = base, 1
+    while Agent.objects.filter(code=candidate).exists():
+        number += 1
+        candidate = f"{base}{number}"
+    return candidate
+
+
+def submit_application(agent: Agent) -> None:
+    """Ariza to'ldirildi — platforma egasiga "Qabul / Rad" tugmalari bilan yuboriladi."""
+    agent.applied_at = timezone.now()
+    agent.save(update_fields=["applied_at"])
+    agent_id = agent.pk
+
+    def send():
+        fresh = Agent.objects.get(pk=agent_id)
+        text = (
+            f"🙋 <b>Yangi agent arizasi</b>\n\n"
+            f"Ism: <b>{fresh.name}</b>\n"
+            f"Telefon: {fresh.phone or '—'}\n"
+            f"Shahar: {fresh.city or '—'}\n"
+            f"Telegram: {'@' + fresh.telegram_username if fresh.telegram_username else '—'}\n"
+            f"Tanishlar: {fresh.note or '—'}"
+        )
+        try:
+            get_bot().send_buttons(
+                text, [("✅ Qabul qilish", f"ag_ok:{fresh.pk}"), ("❌ Rad etish", f"ag_no:{fresh.pk}")]
+            )
+        except TelegramError as error:
+            logger.warning("Agent arizasi Telegram'ga yuborilmadi: %s", error)
+
+    transaction.on_commit(send)
+
+
+@transaction.atomic
+def approve_application(agent: Agent) -> bool:
+    """Arizani qabul qiladi: kod beradi, faollashtiradi, agentga xabar. Qayta bosilsa `False`."""
+    fresh = Agent.objects.select_for_update().get(pk=agent.pk)
+    if not fresh.is_pending:
+        return False
+    fresh.code = generate_code(fresh.name)
+    fresh.is_active = True
+    fresh.approved_at = timezone.now()
+    fresh.save(update_fields=["code", "is_active", "approved_at"])
+    notify_agent(
+        fresh,
+        f"🎉 Tabriklaymiz, <b>{fresh.name}</b>! Arizangiz qabul qilindi — siz stolda.uz agentisiz.\n\n"
+        f"Kodingiz: <b>{fresh.code}</b>\n"
+        f"Restoran sizning havolangiz yoki kodingiz bilan ro'yxatdan o'tsa, uning har to'lovidan "
+        f"<b>{fresh.percent}%</b> ({fresh.months} oy davomida) va birinchi to'lov uchun "
+        f"<b>{money(fresh.first_bonus)}</b> bonus olasiz.\n\n"
+        f"Boshlash uchun «🔗 Havolam» ni bosing.",
+        main_keyboard=True,
+    )
+    return True
+
+
+@transaction.atomic
+def reject_application(agent: Agent) -> bool:
+    fresh = Agent.objects.select_for_update().get(pk=agent.pk)
+    if not fresh.is_pending:
+        return False
+    fresh.rejected_at = timezone.now()
+    fresh.is_active = False
+    fresh.save(update_fields=["rejected_at", "is_active"])
+    notify_agent(
+        fresh,
+        "Rahmat, arizangiz ko'rib chiqildi. Afsuski, hozircha qabul qila olmaymiz. "
+        "Savollar bo'lsa: @aha_daragoy",
+    )
+    return True
 
 
 # ── Biriktirish ────────────────────────────────────────────────────────

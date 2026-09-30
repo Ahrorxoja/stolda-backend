@@ -47,8 +47,11 @@ class Bot(Protocol):
 class ChatBot(Protocol):
     """Ko'p foydalanuvchili bot (agentlar) — har xabar kimga ekani aniq beriladi."""
 
-    def send(self, chat_id: str, text: str, keyboard: list[list[str]] | None = None) -> str:
-        """Xabar; `keyboard` — pastdagi doimiy tugmalar (qatorlar bo'yicha)."""
+    def send(self, chat_id: str, text: str, keyboard: list[list] | None = None) -> str:
+        """Xabar; `keyboard` — pastdagi tugmalar (qatorlar bo'yicha), `[]` — olib tashlash.
+
+        Tugma — matn yoki `{"text": ..., "request_contact": True}`.
+        """
         ...
 
     def send_photo(self, chat_id: str, image: bytes, caption: str = "") -> str:

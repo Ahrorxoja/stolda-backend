@@ -54,7 +54,7 @@ class FakeChatBot:
         self.sent: list[dict] = []
         self._ids = itertools.count(1)
 
-    def send(self, chat_id: str, text: str, keyboard: list[list[str]] | None = None) -> str:
+    def send(self, chat_id: str, text: str, keyboard: list[list] | None = None) -> str:
         message_id = str(next(self._ids))
         self.sent.append({"chat_id": str(chat_id), "text": text, "keyboard": keyboard})
         return message_id

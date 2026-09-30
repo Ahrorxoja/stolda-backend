@@ -33,16 +33,27 @@ def _invite_token() -> str:
 class Agent(models.Model):
     name = models.CharField("Ismi", max_length=80)
     phone = models.CharField("Telefon", max_length=20, blank=True)
+    #: Ariza hali tasdiqlanmagan bo'lsa bo'sh — kod qabul qilinganda beriladi.
     code = models.CharField(
         "Kodi",
         max_length=16,
         unique=True,
+        null=True,
+        blank=True,
         validators=[validate_code],
         help_text="Havola va ro'yxatdan o'tishda kiritiladi: ALI, JASUR25…",
     )
     is_active = models.BooleanField(
         "Faol", default=True, help_text="O'chirilsa yangi restoran ham, yangi daromad ham yozilmaydi."
     )
+    city = models.CharField("Shahar", max_length=60, blank=True)
+    #: Arizadagi "restoranlar bilan tanishlaringiz bormi?" javobi.
+    note = models.CharField("Ariza izohi", max_length=300, blank=True)
+    #: Bot orqali ariza — `applied_at` bor, `approved_at`/`rejected_at` hali yo'q.
+    #: Django admin'da qo'lda qo'shilgan agentda uchalasi ham bo'sh.
+    applied_at = models.DateTimeField("Ariza sanasi", null=True, blank=True, editable=False)
+    approved_at = models.DateTimeField("Qabul qilingan", null=True, blank=True, editable=False)
+    rejected_at = models.DateTimeField("Rad etilgan", null=True, blank=True, editable=False)
 
     # Shartlar — hammaga bir xil sukut, kerak bo'lsa agentga alohida.
     percent = models.PositiveSmallIntegerField("Har to'lovdan, %", default=20)
@@ -69,10 +80,21 @@ class Agent(models.Model):
         verbose_name_plural = "agentlar"
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.code})"
+        return f"{self.name} ({self.code or 'ariza'})"
+
+    def clean(self) -> None:
+        # Qo'lda qo'shilgan yoki qabul qilingan faol agentga kod shart.
+        if self.is_active and not normalize_code(self.code or "") and not self.is_pending:
+            raise ValidationError({"code": "Faol agentga kod kerak, masalan ALI."})
+
+    @property
+    def is_pending(self) -> bool:
+        """Bot orqali ariza topshirgan, hali javob berilmagan."""
+        return bool(self.applied_at) and not self.approved_at and not self.rejected_at
 
     def save(self, *args, **kwargs):
-        self.code = normalize_code(self.code)
+        # Bo'sh kod `NULL` bo'lsin — `unique` bir nechta arizaga xalaqit bermasin.
+        self.code = normalize_code(self.code or "") or None
         super().save(*args, **kwargs)
 
 

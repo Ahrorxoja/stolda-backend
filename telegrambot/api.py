@@ -155,17 +155,24 @@ class TelegramChatBot(TelegramBot):
     def __init__(self, token: str, timeout: int = 30, session: requests.Session | None = None):
         super().__init__(token, chat_id="", timeout=timeout, session=session)
 
-    def send(self, chat_id: str, text: str, keyboard: list[list[str]] | None = None) -> str:
+    def send(self, chat_id: str, text: str, keyboard: list[list] | None = None) -> str:
         data = {
             "chat_id": chat_id,
             "text": text,
             "parse_mode": "HTML",
             "disable_web_page_preview": True,
         }
-        if keyboard:
+        if keyboard == []:
+            # Bo'sh ro'yxat — pastdagi tugmalarni olib tashlash (masalan raqam so'ralgach).
+            data["reply_markup"] = json.dumps({"remove_keyboard": True})
+        elif keyboard:
             data["reply_markup"] = json.dumps(
                 {
-                    "keyboard": [[{"text": label} for label in row] for row in keyboard],
+                    # Tugma matn yoki `{"text": ..., "request_contact": true}` bo'lishi mumkin.
+                    "keyboard": [
+                        [{"text": label} if isinstance(label, str) else label for label in row]
+                        for row in keyboard
+                    ],
                     "resize_keyboard": True,
                     "is_persistent": True,
                 }

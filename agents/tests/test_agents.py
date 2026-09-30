@@ -330,10 +330,12 @@ class AgentBotTests(AgentTestCase):
         self.assertIn("ALI25", reply["text"])
         self.assertEqual(reply["keyboard"], agent_bot.KEYBOARD)
 
-    def test_strangers_are_turned_away(self):
-        self.assertIn("agentlari uchun", self.say("/start", chat_id="1")["text"])
-        self.assertIn("agentlari uchun", self.say(agent_bot.BTN_BALANCE, chat_id="1")["text"])
-        self.assertIn("agentlari uchun", self.say("/start boshqa-token", chat_id="1")["text"])
+    def test_strangers_see_the_offer_not_anyones_data(self):
+        for text in ("/start", agent_bot.BTN_BALANCE, "/start boshqa-token"):
+            reply = self.say(text, chat_id="1")
+            self.assertIn("Agent bo'lish", reply["text"])
+            self.assertNotIn("Balans", reply["text"])
+            self.assertEqual(reply["keyboard"], [[agent_bot.BTN_APPLY]])
 
     def test_invite_cannot_be_reused_by_another_account(self):
         self.say(f"/start {self.agent.invite_token}")
@@ -400,3 +402,135 @@ class AgentBotTests(AgentTestCase):
         agent_bot.handle_message(self.bot, {"chat": {"id": "-100", "type": "group"}, "text": "/start"})
 
         self.assertEqual(self.bot.sent, [])
+
+
+@override_settings(TELEGRAM_ADMIN_CHAT_ID=ADMIN_CHAT_ID)
+class ApplicationTests(AgentTestCase):
+    """Agent o'zi ariza to'ldiradi, platforma egasi Telegram'da tasdiqlaydi."""
+
+    CHAT = "555"
+
+    def setUp(self):
+        super().setUp()
+        self.bot = FakeChatBot()
+
+    def say(self, text: str = "", contact=None, user_id=555):
+        message = {"chat": {"id": self.CHAT, "type": "private"}, "from": {"id": user_id, "username": "vali"}}
+        if text:
+            message["text"] = text
+        if contact:
+            message["contact"] = contact
+        with self.captureOnCommitCallbacks(execute=True):
+            agent_bot.handle_message(self.bot, message)
+        return self.bot.sent[-1]
+
+    def apply(self, name="Vali Karimov", note="3 ta tanish restoran bor"):
+        self.say("/start")
+        self.say(agent_bot.BTN_APPLY)
+        self.say(name)
+        self.say(contact={"phone_number": "998901234567", "user_id": 555})
+        self.say("Toshkent")
+        return self.say(note)
+
+    def agent(self) -> Agent:
+        return Agent.objects.get(telegram_chat_id=self.CHAT)
+
+    def test_full_application_reaches_the_owner(self):
+        reply = self.apply()
+
+        self.assertIn("Arizangiz yuborildi", reply["text"])
+        agent = self.agent()
+        self.assertTrue(agent.is_pending)
+        self.assertFalse(agent.is_active)
+        self.assertIsNone(agent.code)
+        self.assertEqual((agent.name, agent.phone, agent.city), ("Vali Karimov", "+998901234567", "Toshkent"))
+        owner = self.owner_bot.sent[-1]
+        self.assertIn("Vali Karimov", owner["text"])
+        self.assertIn("+998901234567", owner["text"])
+        self.assertEqual(owner["buttons"], [("✅ Qabul qilish", f"ag_ok:{agent.pk}"), ("❌ Rad etish", f"ag_no:{agent.pk}")])
+
+    def test_phone_button_is_offered_and_other_peoples_contacts_refused(self):
+        self.say("/start")
+        self.say(agent_bot.BTN_APPLY)
+        ask = self.say("Vali Karimov")
+        self.assertEqual(ask["keyboard"], [[agent_bot.BTN_CONTACT]])
+
+        refused = self.say(contact={"phone_number": "998907777777", "user_id": 999})
+        self.assertIn("o'zingizning raqamingizni", refused["text"])
+        self.assertEqual(self.agent().phone, "")
+
+    def test_bad_inputs_are_asked_again(self):
+        self.say("/start")
+        self.say(agent_bot.BTN_APPLY)
+        self.assertIn("to'liq yozing", self.say("A")["text"])
+        self.say("Vali Karimov")
+        self.assertIn("tugmasini bosing", self.say("salom")["text"])
+        self.say("+998 90 123 45 67")  # qo'lda yozilgan to'g'ri raqam ham qabul
+        self.assertEqual(self.agent().phone, "+998901234567")
+
+    def test_note_can_be_skipped(self):
+        self.apply(note=agent_bot.BTN_SKIP)
+
+        self.assertEqual(self.agent().note, "")
+
+    def test_pending_applicant_cannot_use_agent_features(self):
+        self.apply()
+
+        self.assertIn("ko'rib chiqilmoqda", self.say(agent_bot.BTN_BALANCE)["text"])
+        self.assertIn("ko'rib chiqilmoqda", self.say("/start")["text"])
+
+    def press(self, action: str, agent: Agent, chat_id=ADMIN_CHAT_ID) -> FakeBot:
+        bot = FakeBot()
+        with self.captureOnCommitCallbacks(execute=True):
+            OwnerBotCommand()._handle_callback(
+                bot,
+                {
+                    "id": "cb",
+                    "data": f"{action}:{agent.pk}",
+                    "message": {"message_id": "5", "chat": {"id": chat_id}, "text": "ariza"},
+                },
+            )
+        return bot
+
+    def test_owner_approves_and_agent_gets_code_and_buttons(self):
+        self.apply()
+
+        bot = self.press("ag_ok", self.agent())
+
+        agent = self.agent()
+        self.assertEqual(agent.code, "VALI")
+        self.assertTrue(agent.is_active)
+        self.assertIn("kod VALI", bot.edited[0]["text"])
+        welcome = self.agent_bot.sent[-1]
+        self.assertIn("Tabriklaymiz", welcome["text"])
+        self.assertEqual(welcome["keyboard"], agent_bot.KEYBOARD)
+        # Endi agent — balansni ko'radi.
+        self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
+        # Qayta bosish — hech narsa o'zgarmaydi.
+        self.assertIn("allaqachon", self.press("ag_ok", agent).answered[0]["text"])
+
+    def test_owner_rejects(self):
+        self.apply()
+
+        self.press("ag_no", self.agent())
+
+        agent = self.agent()
+        self.assertIsNotNone(agent.rejected_at)
+        self.assertIsNone(agent.code)
+        self.assertIn("qabul qila olmaymiz", self.agent_bot.sent[-1]["text"])
+        self.assertIn("qabul qila olmaymiz", self.say(agent_bot.BTN_APPLY)["text"])
+
+    def test_stranger_cannot_approve(self):
+        self.apply()
+
+        self.press("ag_ok", self.agent(), chat_id="1")
+
+        self.assertTrue(self.agent().is_pending)
+
+    def test_codes_are_unique_and_readable(self):
+        make_agent(name="Vali Boshqa", code="VALI")
+        self.assertEqual(services.generate_code("Vali Karimov"), "VALI2")
+        self.assertEqual(services.generate_code("Алишер Усмонов"), "ALISHER")
+        self.assertEqual(services.generate_code("Bo"), "BOAGE")
+        self.assertEqual(services.generate_code("Oʻktam"), "OKTAM")
+
