@@ -274,3 +274,17 @@ def _send_digest(lines: list[str], today) -> None:
         # Eslatma yetib bormasa ham obuna holati to'g'ri hisoblangan —
         # vazifani yiqitmaymiz.
         logger.warning("Kunlik eslatma yuborilmadi: %s", error)
+
+
+@shared_task
+def send_monthly_report() -> None:
+    """Har oyning 1-sanasi: o'tgan oy hisoboti platforma egasining Telegramiga."""
+    from .platform import monthly_report_text, shift_month
+
+    today = timezone.localdate()
+    year, month = shift_month(today.year, today.month, -1)
+    try:
+        get_bot().send_message(monthly_report_text(year, month))
+    except TelegramError as error:
+        logger.warning("Oylik hisobot yuborilmadi: %s", error)
+

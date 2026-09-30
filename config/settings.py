@@ -175,6 +175,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "menu.tasks.process_subscriptions",
         "schedule": crontab(hour=3, minute=0),
     },
+    # O'tgan oy hisoboti — har oyning 1-sanasi ertalab.
+    "monthly-report": {
+        "task": "menu.tasks.send_monthly_report",
+        "schedule": crontab(day_of_month=1, hour=9, minute=0),
+    },
 }
 
 # Testlar haqiqiy Gemini API'ga chiqmasligi uchun.

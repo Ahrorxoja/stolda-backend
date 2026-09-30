@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -40,6 +40,7 @@ from .models import (
 )
 from agents import services as agent_services
 
+from . import platform
 from . import qr as qr_codes
 from . import qr_print
 from .deletion import delete_restaurant, deletion_summary
@@ -475,12 +476,38 @@ class MeView(APIView):
                 ),
                 "profile": ProfileSerializer(self._profile(request.user)).data,
                 "role": next(iter(roles.values()), None),
+                # "Platforma" bo'limi faqat stolda.uz egasiga ko'rinadi.
+                "is_platform_owner": request.user.is_superuser,
                 "roles": {str(key): value for key, value in roles.items()},
                 "restaurants": RestaurantAdminSerializer(
                     restaurants, many=True, context={"request": request}
                 ).data,
             }
         )
+
+
+class IsPlatformOwner(BasePermission):
+    """stolda.uz egasi (superuser) — restoran egalari va menejerlar emas."""
+
+    def has_permission(self, request, view) -> bool:
+        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+
+
+class PlatformOverviewView(APIView):
+    """`GET /api/platform/overview/?month=2026-09` — pul, restoranlar, agentlar."""
+
+    permission_classes = (IsAuthenticated, IsPlatformOwner)
+
+    def get(self, request):
+        raw = request.query_params.get("month", "")
+        today = timezone.localdate()
+        try:
+            year, month = (int(part) for part in raw.split("-")) if raw else (today.year, today.month)
+            if not 1 <= month <= 12 or not 2020 <= year <= 2100:
+                raise ValueError
+        except ValueError as error:
+            raise ValidationError({"month": "Oy YYYY-MM ko'rinishida bo'lsin, masalan 2026-09."}) from error
+        return Response(platform.overview(year, month))
 
 
 class StatsView(APIView):

@@ -8,6 +8,7 @@ from .admin_views import (
     DishViewSet,
     MeView,
     RestaurantViewSet,
+    PlatformOverviewView,
     StatsView,
     TranslatePreviewView,
 )
@@ -40,6 +41,7 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("me/", MeView.as_view(), name="me"),
     path("stats/", StatsView.as_view(), name="stats"),
+    path("platform/overview/", PlatformOverviewView.as_view(), name="platform-overview"),
     path("translate/preview/", TranslatePreviewView.as_view(), name="translate-preview"),
     # To'lov va tarif — chek yuklash, Telegram'da tasdiqlanadi.
     path("billing/", BillingView.as_view(), name="billing"),
