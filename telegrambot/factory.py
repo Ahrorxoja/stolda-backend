@@ -19,6 +19,12 @@ def get_bot() -> Bot:
     return TelegramBot(token, chat_id)
 
 
+def get_restaurant_bot() -> ChatBot:
+    """@Stoldabot — restoran egalari va xodimlariga xabar (cheklar boti bilan bir token)."""
+    token = getattr(settings, "TELEGRAM_BOT_TOKEN", "")
+    return TelegramChatBot(token) if token else FakeChatBot()
+
+
 def get_agent_bot() -> ChatBot:
     """Agentlar boti. `AGENT_BOT_TOKEN` bo'lmasa `FakeChatBot` — tarmoqqa chiqmaydi."""
     token = getattr(settings, "AGENT_BOT_TOKEN", "")

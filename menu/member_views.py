@@ -15,21 +15,45 @@ from .members import (
     create_invite,
     remove_member,
 )
-from .models import Restaurant, RestaurantInvite, RestaurantMember
-from .permissions import member_restaurant_ids
+from .models import STAFF_PERMISSIONS, Restaurant, RestaurantInvite, RestaurantMember
+from .permissions import member_restaurant_ids, permissions_of
+from .telegram_link import create_telegram_invite
+
+#: Xodim qo'shishdagi tayyor shablonlar.
+TEMPLATES = [
+    {"id": "manager", "label": "Menejer", "permissions": list(STAFF_PERMISSIONS)},
+    {"id": "kitchen", "label": "Oshxona", "permissions": ["stoplist"]},
+]
 
 
 class MemberSerializer(serializers.ModelSerializer):
-    email = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()
     is_you = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+    telegram = serializers.SerializerMethodField()
 
     class Meta:
         model = RestaurantMember
-        fields = ("id", "email", "name", "role", "is_you", "created_at")
+        fields = ("id", "email", "name", "role", "is_you", "permissions", "notify_changes", "telegram", "created_at")
+
+    def get_email(self, obj) -> str:
+        # Telegram orqali qo'shilgan xodimda pochta yo'q — `tg123` ko'rsatilmaydi.
+        return "" if obj.user.username.startswith("tg") and "@" not in obj.user.username else obj.user.username
 
     def get_name(self, obj) -> str:
-        return obj.user.get_full_name() or obj.user.username
+        profile = getattr(obj.user, "profile", None)
+        return (profile.full_name if profile else "") or obj.user.get_full_name() or obj.user.username
+
+    def get_permissions(self, obj) -> list[str]:
+        return permissions_of(obj)
+
+    def get_telegram(self, obj) -> str | None:
+        """Ulangan bo'lsa — `@username` (yoki bo'sh satr), ulanmagan — `None`."""
+        profile = getattr(obj.user, "profile", None)
+        if not profile or not profile.telegram_id:
+            return None
+        return f"@{profile.telegram_username}" if profile.telegram_username else ""
 
     def get_is_you(self, obj) -> bool:
         request = self.context.get("request")
@@ -38,10 +62,11 @@ class MemberSerializer(serializers.ModelSerializer):
 
 class InviteSerializer(serializers.ModelSerializer):
     url = serializers.CharField(read_only=True)
+    is_telegram = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = RestaurantInvite
-        fields = ("id", "email", "url", "created_at", "expires_at")
+        fields = ("id", "email", "name", "permissions", "is_telegram", "url", "created_at", "expires_at")
 
 
 def _restaurant(request) -> Restaurant:
@@ -73,7 +98,7 @@ class MemberListView(APIView):
         restaurant = _restaurant(request)
         members = RestaurantMember.objects.filter(
             restaurant=restaurant
-        ).select_related("user")
+        ).select_related("user", "user__profile")
         invites = RestaurantInvite.objects.filter(
             restaurant=restaurant, accepted_at__isnull=True
         )
@@ -85,24 +110,54 @@ class MemberListView(APIView):
                     members, many=True, context={"request": request}
                 ).data,
                 "invites": InviteSerializer(invites, many=True).data,
+                "permission_choices": [{"code": code, "label": label} for code, label in STAFF_PERMISSIONS.items()],
+                "templates": TEMPLATES,
             }
         )
 
     def post(self, request):
         restaurant = _restaurant(request)
         _require_owner(request, restaurant)
-        invite = create_invite(
-            restaurant, request.data.get("email", ""), invited_by=request.user
-        )
+        if request.data.get("channel") == "telegram":
+            invite = create_telegram_invite(
+                restaurant,
+                request.data.get("name", ""),
+                request.data.get("permissions") or [],
+                invited_by=request.user,
+            )
+        else:
+            invite = create_invite(
+                restaurant, request.data.get("email", ""), invited_by=request.user
+            )
         return Response(
             InviteSerializer(invite).data, status=status.HTTP_201_CREATED
         )
 
 
 class MemberDetailView(APIView):
-    """`DELETE /api/members/{id}/` — a'zoni chiqarish (faqat egasi)."""
+    """`PATCH /api/members/{id}/` — ruxsatlar / xabarlar, `DELETE` — chiqarish (faqat egasi)."""
 
     permission_classes = (IsAuthenticated,)
+
+    def patch(self, request, pk: int):
+        restaurant = _restaurant(request)
+        _require_owner(request, restaurant)
+        member = RestaurantMember.objects.filter(pk=pk, restaurant=restaurant).select_related("user").first()
+        if member is None:
+            raise NotFound("A'zo topilmadi.")
+        fields = []
+        if "permissions" in request.data:
+            if member.is_owner:
+                raise InviteError({"detail": "Egasining ruxsatlari o'zgarmaydi — unda hammasi bor."})
+            chosen = [code for code in request.data.get("permissions") or [] if code in STAFF_PERMISSIONS]
+            member.permissions = chosen
+            fields.append("permissions")
+        if "notify_changes" in request.data:
+            member.notify_changes = bool(request.data.get("notify_changes"))
+            fields.append("notify_changes")
+        if fields:
+            member.save(update_fields=fields)
+        return Response(MemberSerializer(member, context={"request": request}).data)
 
     def delete(self, request, pk: int):
         restaurant = _restaurant(request)

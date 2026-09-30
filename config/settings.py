@@ -135,6 +135,8 @@ REST_FRAMEWORK = {
         "agent_check": "30/hour",
         # Agentlar Mini App'i: borgan joy yozish, karta, pul yechish.
         "agent_app_write": "60/hour",
+        # Restoranlar Mini App'i har ochilganda kiradi; bir Wi-Fi'da bir nechta xodim bo'ladi.
+        "telegram_auth": "300/hour",
     },
 }
 
@@ -205,6 +207,8 @@ PAYMENT_CARD_HOLDER = os.getenv("PAYMENT_CARD_HOLDER", "")
 # so'rov yuborilmaydi.
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "")
+#: Restoranlar va platforma egasining boti (@Stoldabot) — havolalar uchun.
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "Stoldabot").lstrip("@")
 #: Agentlar boti — cheklar botidan alohida (agentlar sizning shaxsiy
 #: chatingiz bilan aralashmasin). Bo'sh bo'lsa xabarlar yuborilmaydi.
 AGENT_BOT_TOKEN = os.getenv("AGENT_BOT_TOKEN", "")

@@ -102,6 +102,11 @@ class Profile(models.Model):
     contact_phone = models.CharField(max_length=32, blank=True)
     #: `@nom` yoki to'liq havola.
     telegram = models.CharField(max_length=120, blank=True)
+    #: @Stoldabot'ga ulangan Telegram hisobi — Mini App shu bilan parolsiz kiradi
+    #: va restoran xabarlari shu chatga boradi (`menu/telegram_link.py`).
+    telegram_id = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    telegram_username = models.CharField(max_length=64, blank=True)
+    telegram_linked_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -269,6 +274,22 @@ def invite_expiry():
     return timezone.now() + timedelta(days=INVITE_DAYS)
 
 
+#: Xodimga egasi beradigan ruxsatlar. Pul, xodimlar, taomni butunlay o'chirish
+#: va restoran sozlamalari bu yerda yo'q — ular doim faqat egasida.
+STAFF_PERMISSIONS = {
+    "stoplist": "Stop-list (taom tugadi / bor)",
+    "dishes": "Taom qo'shish va tahrirlash",
+    "prices": "Narxni o'zgartirish",
+    "categories": "Kategoriyalar",
+    "stats": "Statistikani ko'rish",
+    "qr": "QR kod",
+}
+
+
+def all_staff_permissions() -> list[str]:
+    return list(STAFF_PERMISSIONS)
+
+
 class RestaurantMember(models.Model):
     """Restoranni boshqaradigan odam.
 
@@ -289,6 +310,11 @@ class RestaurantMember(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships"
     )
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.MANAGER)
+    #: Xodimning ruxsatlari (`STAFF_PERMISSIONS` kalitlari). Egasida hammasi bor —
+    #: bu ro'yxat unga qaralmaydi.
+    permissions = models.JSONField(default=all_staff_permissions, blank=True)
+    #: Egasi uchun: xodim narxni o'zgartirsa yoki taom qo'shsa Telegram'ga xabar.
+    notify_changes = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -319,7 +345,10 @@ class RestaurantInvite(models.Model):
         Restaurant, on_delete=models.CASCADE, related_name="invites"
     )
     #: Har doim kichik harfda saqlanadi — Google ham shunday qaytaradi.
-    email = models.EmailField()
+    #: Telegram orqali taklifda bo'sh — xodim havolani bosib, Telegram bilan kiradi.
+    email = models.EmailField(blank=True)
+    name = models.CharField(max_length=80, blank=True)
+    permissions = models.JSONField(default=all_staff_permissions, blank=True)
     token = models.CharField(max_length=64, unique=True, default=generate_invite_token)
     invited_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -338,7 +367,7 @@ class RestaurantInvite(models.Model):
             #: Bitta restoranga bitta pochta uchun bitta kutilayotgan taklif.
             models.UniqueConstraint(
                 fields=("restaurant", "email"),
-                condition=models.Q(accepted_at__isnull=True),
+                condition=models.Q(accepted_at__isnull=True) & ~models.Q(email=""),
                 name="unique_pending_invite",
             )
         ]
@@ -351,9 +380,77 @@ class RestaurantInvite(models.Model):
         return self.accepted_at is None and self.expires_at > timezone.now()
 
     @property
+    def is_telegram(self) -> bool:
+        return not self.email
+
+    @property
     def url(self) -> str:
-        """Egasi menejerga yuboradigan havola."""
+        """Egasi xodimga yuboradigan havola: Telegram taklifi — botga, qolgani — saytga."""
+        if self.is_telegram:
+            return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start=I{self.token}"
         return f"{settings.SITE_URL}/join/{self.token}"
+
+
+LINK_MINUTES = 10
+
+
+def link_expiry():
+    return timezone.now() + timedelta(minutes=LINK_MINUTES)
+
+
+class TelegramLinkToken(models.Model):
+    """Admin paneldan "Telegram'ni ulash" — bir martalik, 10 daqiqalik kalit."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="telegram_links")
+    token = models.CharField(max_length=64, unique=True, default=generate_invite_token)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=link_expiry)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_valid(self) -> bool:
+        return self.used_at is None and self.expires_at > timezone.now()
+
+    @property
+    def url(self) -> str:
+        return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start=L{self.token}"
+
+
+class ActivityLog(models.Model):
+    """"Kim nima qildi" — menyudagi o'zgarishlar (ko'rishlar emas). 90 kun saqlanadi."""
+
+    class Action(models.TextChoices):
+        DISH_CREATED = "dish_created", "Taom qo'shildi"
+        DISH_UPDATED = "dish_updated", "Taom tahrirlandi"
+        PRICE_CHANGED = "price_changed", "Narx o'zgardi"
+        STOCK_OFF = "stock_off", "Tugadi"
+        STOCK_ON = "stock_on", "Yana bor"
+        DISH_DELETED = "dish_deleted", "Taom o'chirildi"
+        CATEGORY_CREATED = "category_created", "Kategoriya qo'shildi"
+        CATEGORY_UPDATED = "category_updated", "Kategoriya tahrirlandi"
+        CATEGORY_DELETED = "category_deleted", "Kategoriya o'chirildi"
+
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name="activity")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    #: Ism saqlab qo'yiladi — xodim chiqarilgandan keyin ham jurnalda ko'rinsin.
+    actor = models.CharField(max_length=120)
+    action = models.CharField(max_length=20, choices=Action.choices)
+    target = models.CharField(max_length=160)
+    detail = models.CharField(max_length=200, blank=True)
+    #: Qaytarish uchun: `{"dish": id, "old": 45000, "new": 50000}`.
+    data = models.JSONField(default=dict, blank=True)
+    undone_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "o'zgarish"
+        verbose_name_plural = "o'zgarishlar jurnali"
+
+    def __str__(self) -> str:
+        return f"{self.actor}: {self.get_action_display()} — {self.target}"
 
 
 class Plan(models.Model):

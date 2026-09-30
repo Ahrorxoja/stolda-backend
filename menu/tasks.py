@@ -179,6 +179,12 @@ def process_subscriptions() -> dict:
     agent_events: dict[int, list[str]] = {}
 
     def tell_agent(subscription: Subscription, kind: str, when=None) -> None:
+        # Restoran egasiga ham — Telegram'ini ulagan bo'lsa (@Stoldabot).
+        from .notify import subscription_event
+
+        subscription_event(
+            subscription.restaurant, kind, timezone.localtime(when).strftime("%d.%m") if when else ""
+        )
         if subscription.restaurant.agent_id:
             from agents.services import reminder_line
 
@@ -248,6 +254,10 @@ def process_subscriptions() -> dict:
     from agents.services import remind_agents
 
     remind_agents(agent_events)
+    # "Kim nima qildi" jurnali 90 kun saqlanadi.
+    from .activity import prune
+
+    prune()
     return stats
 
 

@@ -44,7 +44,15 @@ from . import platform
 from . import qr as qr_codes
 from . import qr_print
 from .deletion import delete_restaurant, deletion_summary
-from .permissions import IsRestaurantMember, is_owner, member_restaurant_ids
+from . import activity
+from .permissions import (
+    IsRestaurantMember,
+    is_owner,
+    member_restaurant_ids,
+    permissions_of,
+    require,
+    require_owner,
+)
 from .serializers import absolute_media_url
 from .phones import normalize_phone
 from .slugs import RESERVED_SLUGS, normalize_slug
@@ -76,6 +84,9 @@ class OwnerScopedViewSet(viewsets.ModelViewSet):
         # bulk_update signal yubormaydi — keshni o'zimiz yangilaymiz.
         self._invalidate()
         return Response({"updated": len(objects)})
+
+    def _own_restaurant(self) -> Restaurant | None:
+        return Restaurant.objects.filter(pk__in=member_restaurant_ids(self.request.user)).first()
 
     def _invalidate(self) -> None:
         from .cache import bump_menu_version
@@ -162,7 +173,14 @@ class RestaurantViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Restoranni faqat egasi o'chira oladi.")
         return Response(deletion_summary(restaurant))
 
+    #: QR ko'rinishi — xodimga "QR kod" ruxsati bilan ochiq; boshqa sozlamalar faqat egasida.
+    QR_FIELDS = {"qr_color", "qr_center", "qr_style", "qr_eyes", "qr_frame", "qr_title", "qr_text", "qr_show_link"}
+
     def perform_update(self, serializer):
+        if set(serializer.validated_data) <= self.QR_FIELDS:
+            require(serializer.instance, self.request.user, "qr")
+        else:
+            require_owner(serializer.instance, self.request.user, "Restoran sozlamalarini faqat egasi o'zgartira oladi.")
         before = set(serializer.instance.languages or [])
         # Ro'yxatdan o'tishda orqaga qaytib kodni keyin yozgan bo'lsa ham —
         # faqat hali agent yo'q va sinovda bo'lsa (to'lagandan keyin — admin orqali).
@@ -207,6 +225,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         o'qilmasa, soddarog'i beriladi.
         """
         restaurant = self.get_object()
+        require(restaurant, request.user, "qr")
         params = request.query_params
         fmt = params.get("format", "png")
         template = params.get("template") or None
@@ -304,6 +323,16 @@ class CategoryViewSet(OwnerScopedViewSet):
             restaurant_id__in=member_restaurant_ids(self.request.user)
         ).select_related("restaurant")
 
+    def perform_create(self, serializer):
+        require(serializer.validated_data["restaurant"], self.request.user, "categories")
+        category = serializer.save()
+        activity.log(category.restaurant, self.request.user, activity.A.CATEGORY_CREATED, activity.category_title(category))
+
+    def perform_update(self, serializer):
+        require(serializer.instance.restaurant, self.request.user, "categories")
+        category = serializer.save()
+        activity.log(category.restaurant, self.request.user, activity.A.CATEGORY_UPDATED, activity.category_title(category))
+
     def perform_destroy(self, instance: Category):
         """Ichida taom bo'lsa o'chirishga ruxsat bermaymiz.
 
@@ -318,10 +347,13 @@ class CategoryViewSet(OwnerScopedViewSet):
                     "Avval ularni boshqa kategoriyaga o'tkazing."
                 }
             )
+        require(instance.restaurant, self.request.user, "categories")
+        activity.log(instance.restaurant, self.request.user, activity.A.CATEGORY_DELETED, activity.category_title(instance))
         super().perform_destroy(instance)
 
     @action(detail=False, methods=["post"])
     def reorder(self, request):
+        require(self._own_restaurant(), request.user, "categories")
         return super().reorder(request)
 
 
@@ -342,8 +374,48 @@ class DishViewSet(OwnerScopedViewSet):
             queryset = queryset.filter(category_id=category)
         return queryset
 
+    def perform_create(self, serializer):
+        require(serializer.validated_data["category"].restaurant, self.request.user, "dishes")
+        dish = serializer.save()
+        activity.dish_saved(self.request.user, dish, None)
+
+    def perform_update(self, serializer):
+        dish = serializer.instance
+        for permission in self._needed(dish, serializer.validated_data):
+            require(dish.category.restaurant, self.request.user, permission)
+        before = activity.dish_snapshot(dish)
+        dish = serializer.save()
+        activity.dish_saved(self.request.user, dish, before)
+
+    @staticmethod
+    def _needed(dish: Dish, data: dict) -> set[str]:
+        """Qaysi ruxsat kerak: narx — "prices", mavjudlik — "stoplist", qolgani — "dishes".
+
+        Faqat haqiqatan o'zgargan maydonlar hisobga olinadi — admin panel formani
+        butunicha yuborsa ham, faqat narxni o'zgartirgan xodimga "dishes" kerak bo'lmaydi.
+        """
+        needed = set()
+        for key, value in data.items():
+            if key == "translation_meta":
+                continue
+            if key in ("photo", "photo_original"):
+                needed.add("dishes")
+                continue
+            current = dish.category if key == "category" else getattr(dish, key, None)
+            if current == value:
+                continue
+            needed.add({"price": "prices", "is_available": "stoplist"}.get(key, "dishes"))
+        return needed
+
+    def perform_destroy(self, instance: Dish):
+        restaurant = instance.category.restaurant
+        require_owner(restaurant, self.request.user, "Taomni faqat egasi o'chira oladi. Yashirib qo'yishingiz mumkin.")
+        activity.log(restaurant, self.request.user, activity.A.DISH_DELETED, activity.dish_title(instance))
+        super().perform_destroy(instance)
+
     @action(detail=False, methods=["post"])
     def reorder(self, request):
+        require(self._own_restaurant(), request.user, "dishes")
         return super().reorder(request)
 
 
@@ -361,16 +433,19 @@ class DishPhotoViewSet(OwnerScopedViewSet):
 
     def perform_create(self, serializer):
         dish = serializer.validated_data["dish"]
+        require(dish.category.restaurant, self.request.user, "dishes")
         last = DishPhoto.objects.filter(dish=dish).count()
         serializer.save(position=serializer.validated_data.get("position", last))
         self._invalidate()
 
     def perform_destroy(self, instance):
+        require(instance.dish.category.restaurant, self.request.user, "dishes")
         super().perform_destroy(instance)
         self._invalidate()
 
     @action(detail=False, methods=["post"])
     def reorder(self, request):
+        require(self._own_restaurant(), request.user, "dishes")
         return super().reorder(request)
 
 
@@ -479,6 +554,12 @@ class MeView(APIView):
                 # "Platforma" bo'limi faqat stolda.uz egasiga ko'rinadi.
                 "is_platform_owner": request.user.is_superuser,
                 "roles": {str(key): value for key, value in roles.items()},
+                # Xodim ruxsatlari — ilova va admin panel ruxsatsiz bo'limni ko'rsatmaydi.
+                "permissions": {
+                    str(member.restaurant_id): permissions_of(member)
+                    for member in RestaurantMember.objects.filter(user=request.user)
+                },
+                "telegram": bool(self._profile(request.user).telegram_id),
                 "restaurants": RestaurantAdminSerializer(
                     restaurants, many=True, context={"request": request}
                 ).data,
@@ -517,6 +598,7 @@ class StatsView(APIView):
 
     def get(self, request):
         restaurant = self._restaurant(request)
+        require(restaurant, request.user, "stats")
         if not restaurant.limits["stats"]:
             raise PermissionDenied(
                 "Statistika Standard va Pro tariflarida mavjud."

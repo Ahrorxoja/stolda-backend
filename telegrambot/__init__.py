@@ -7,7 +7,7 @@ paketi bilan bir xil naqsh).
 
 from .api import TelegramBot, TelegramChatBot
 from .base import Bot, ChatBot, TelegramError
-from .factory import get_agent_bot, get_bot
+from .factory import get_agent_bot, get_bot, get_restaurant_bot
 from .fake import FakeBot, FakeChatBot
 
 __all__ = [
@@ -20,4 +20,5 @@ __all__ = [
     "TelegramError",
     "get_agent_bot",
     "get_bot",
+    "get_restaurant_bot",
 ]

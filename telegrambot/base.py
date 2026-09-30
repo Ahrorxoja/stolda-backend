@@ -70,7 +70,11 @@ class ChatBot(Protocol):
         """Yozish maydoni yonidagi menyu tugmasi — Mini App'ni ochadi (hamma chatlar uchun)."""
         ...
 
-    def set_commands(self, commands: list[tuple[str, str]]) -> None:
+    def send_inline(self, chat_id: str, text: str, buttons: list[tuple[str, str]]) -> str:
+        """Xabar ostida callback tugmalari: `[("↩️ Qaytarish", "undo:12")]`."""
+        ...
+
+    def set_commands(self, commands: list[tuple[str, str]], chat_id: str | None = None) -> None:
         """Telegram'dagi "Menu" ro'yxati: `[("start", "Boshlash"), ...]`."""
         ...
 

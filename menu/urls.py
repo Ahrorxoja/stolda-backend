@@ -21,6 +21,7 @@ from .member_views import (
     MemberDetailView,
     MemberListView,
 )
+from .telegram_views import ActivityUndoView, ActivityView, TelegramAuthView, TelegramLinkView
 from .views import PublicMenuView, PublicSitemapView, PublicViewEventView
 
 router = DefaultRouter()
@@ -37,6 +38,10 @@ urlpatterns = [
     # Admin — JWT
     path("auth/signup/", SignupView.as_view(), name="signup"),
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
+    path("auth/telegram/", TelegramAuthView.as_view(), name="telegram-auth"),
+    path("telegram/link/", TelegramLinkView.as_view(), name="telegram-link"),
+    path("activity/", ActivityView.as_view(), name="activity"),
+    path("activity/<int:pk>/undo/", ActivityUndoView.as_view(), name="activity-undo"),
     path("auth/token/", PhoneTokenObtainView.as_view(), name="token-obtain"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("me/", MeView.as_view(), name="me"),

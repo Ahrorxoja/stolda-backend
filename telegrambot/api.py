@@ -138,7 +138,8 @@ class TelegramBot:
             data={
                 "offset": offset,
                 "timeout": timeout,
-                "allowed_updates": json.dumps(["callback_query"]),
+                # Cheklar tugmalari va restoran egalarining xabarlari (@Stoldabot).
+                "allowed_updates": json.dumps(["callback_query", "message"]),
             },
             # HTTP kutish uzun so'rovdan uzunroq bo'lishi kerak.
             timeout=timeout + 10,
@@ -215,11 +216,32 @@ class TelegramChatBot(TelegramBot):
             data={"menu_button": json.dumps({"type": "web_app", "text": label, "web_app": {"url": url}})},
         )
 
-    def set_commands(self, commands: list[tuple[str, str]]) -> None:
-        self._call(
-            "setMyCommands",
-            data={"commands": json.dumps([{"command": c, "description": d} for c, d in commands])},
+    def send_inline(self, chat_id: str, text: str, buttons: list[tuple[str, str]]) -> str:
+        result = self._call(
+            "sendMessage",
+            data={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": json.dumps(
+                    {"inline_keyboard": [[{"text": label, "callback_data": data} for label, data in buttons]]}
+                ),
+            },
         )
+        return str(result.get("message_id", ""))
+
+    def edit_chat_text(self, chat_id: str, message_id: str, text: str) -> None:
+        self._call(
+            "editMessageText",
+            data={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "HTML"},
+        )
+
+    def set_commands(self, commands: list[tuple[str, str]], chat_id: str | None = None) -> None:
+        data = {"commands": json.dumps([{"command": c, "description": d} for c, d in commands])}
+        if chat_id:
+            # Faqat shu chatga — masalan platforma egasiga qo'shimcha buyruqlar.
+            data["scope"] = json.dumps({"type": "chat", "chat_id": chat_id})
+        self._call("setMyCommands", data=data)
 
     def get_updates(self, offset: int, timeout: int = 25) -> list[dict]:
         result = self._call(

@@ -16,7 +16,8 @@ from agents.models import Agent, AgentWithdrawal
 from agents.services import approve_application, reject_application, settle_withdrawal
 from menu.billing_ledger import approve_receipt, reject_receipt
 from menu.models import PaymentReceipt
-from telegrambot import TelegramError, get_bot
+from menu import tgbot
+from telegrambot import TelegramError, get_bot, get_restaurant_bot
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class Command(BaseCommand):
             )
 
         bot = get_bot()
+        # Xuddi shu token — restoranlarga ixtiyoriy chatga yozish uchun (`menu/tgbot.py`).
+        chat_bot = get_restaurant_bot()
+        tgbot.setup(chat_bot)
         offset = 0
         self.stdout.write("Telegram bot ishga tushdi, cheklar kutilmoqda…")
 
@@ -47,9 +51,19 @@ class Command(BaseCommand):
 
             for update in updates:
                 offset = update["update_id"] + 1
-                callback = update.get("callback_query")
-                if callback:
-                    self._handle_callback(bot, callback)
+                try:
+                    callback = update.get("callback_query")
+                    if callback and str(callback.get("data", "")).startswith("undo:"):
+                        # Restoran egasining "↩️ Qaytarish" tugmasi — admin chati emas.
+                        tgbot.handle_undo(chat_bot, callback)
+                    elif callback:
+                        self._handle_callback(bot, callback)
+                    elif update.get("message"):
+                        tgbot.handle_message(chat_bot, update["message"])
+                except TelegramError as error:
+                    logger.warning("Javob yuborilmadi: %s", error)
+                except Exception:  # noqa: BLE001 — bitta xabar botni to'xtatmasin
+                    logger.exception("Telegram yangilanishini qayta ishlashda xato")
 
     def _handle_callback(self, bot, callback: dict) -> None:
         chat_id = str(callback.get("message", {}).get("chat", {}).get("id", ""))

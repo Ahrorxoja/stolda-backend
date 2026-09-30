@@ -96,12 +96,22 @@ def approve_receipt(receipt: PaymentReceipt) -> Invoice | None:
     fresh.reviewed_at = timezone.now()
     fresh.save(update_fields=["status", "reviewed_at"])
 
-    return record_payment(
+    invoice = record_payment(
         subscription,
         provider_payment_id=f"receipt_{fresh.pk}",
         amount=fresh.amount,
         receipt=fresh,
     )
+    from .notify import receipt_reviewed
+
+    subscription.refresh_from_db()
+    until = subscription.current_period_end
+    receipt_reviewed(
+        subscription.restaurant,
+        approved=True,
+        until=timezone.localtime(until).strftime("%d.%m.%Y") if until else "",
+    )
+    return invoice
 
 
 @transaction.atomic
@@ -115,4 +125,7 @@ def reject_receipt(receipt: PaymentReceipt, note: str = "") -> bool:
     fresh.note = note
     fresh.reviewed_at = timezone.now()
     fresh.save(update_fields=["status", "note", "reviewed_at"])
+    from .notify import receipt_reviewed
+
+    receipt_reviewed(fresh.subscription.restaurant, approved=False, note=note)
     return True

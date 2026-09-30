@@ -80,8 +80,20 @@ class FakeChatBot:
     def set_menu_app(self, label: str, url: str) -> None:
         self.menu_app = (label, url)
 
-    def set_commands(self, commands: list[tuple[str, str]]) -> None:
-        self.commands = list(commands)
+    def send_inline(self, chat_id: str, text: str, buttons: list[tuple[str, str]]) -> str:
+        message_id = str(next(self._ids))
+        self.sent.append({"chat_id": str(chat_id), "text": text, "buttons": list(buttons)})
+        return message_id
+
+    def edit_chat_text(self, chat_id: str, message_id: str, text: str) -> None:
+        self.edited = getattr(self, "edited", []) + [{"chat_id": str(chat_id), "message_id": message_id, "text": text}]
+
+    def answer_callback(self, callback_id: str, text: str = "") -> None:
+        self.answered = getattr(self, "answered", []) + [{"id": callback_id, "text": text}]
+
+    def set_commands(self, commands: list[tuple[str, str]], chat_id: str | None = None) -> None:
+        """`commands[""]` — hammaga, `commands["<chat>"]` — shu chatga."""
+        self.commands = {**getattr(self, "commands", {}), chat_id or "": list(commands)}
 
     def texts(self, chat_id: str) -> list[str]:
         return [item.get("text") or item.get("caption", "") for item in self.sent if item["chat_id"] == str(chat_id)]
