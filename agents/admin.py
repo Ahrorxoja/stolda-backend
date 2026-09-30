@@ -36,11 +36,22 @@ class AgentAdmin(admin.ModelAdmin):
     )
     list_filter = ("is_active", ApplicationFilter)
     search_fields = ("name", "code", "phone", "telegram_username", "city")
-    readonly_fields = ("links", "telegram", "balance_info", "created_at", "applied_at", "approved_at", "rejected_at")
+    readonly_fields = (
+        "links",
+        "telegram",
+        "balance_info",
+        "created_at",
+        "applied_at",
+        "approved_at",
+        "rejected_at",
+        "rules_version",
+        "rules_accepted_at",
+    )
     actions = ("approve", "reject")
     fieldsets = (
         (None, {"fields": ("name", "phone", "city", "code", "is_active")}),
         ("Ariza", {"fields": ("note", "applied_at", "approved_at", "rejected_at")}),
+        ("Qoidalar", {"fields": ("rules_version", "rules_accepted_at")}),
         ("Havolalar", {"fields": ("links", "telegram")}),
         ("Shartlar", {"fields": ("first_percent", "percent", "months")}),
         ("Karta", {"fields": ("card_number", "card_holder")}),

@@ -52,6 +52,9 @@ class Agent(models.Model):
     #: Bot orqali ariza — `applied_at` bor, `approved_at`/`rejected_at` hali yo'q.
     #: Django admin'da qo'lda qo'shilgan agentda uchalasi ham bo'sh.
     applied_at = models.DateTimeField("Ariza sanasi", null=True, blank=True, editable=False)
+    #: Qaysi qoidalarga (`agents/rules.py: RULES_VERSION`) va qachon rozi bo'lgan.
+    rules_version = models.CharField("Qoidalar versiyasi", max_length=10, blank=True, editable=False)
+    rules_accepted_at = models.DateTimeField("Qoidalarga rozi", null=True, blank=True, editable=False)
     approved_at = models.DateTimeField("Qabul qilingan", null=True, blank=True, editable=False)
     rejected_at = models.DateTimeField("Rad etilgan", null=True, blank=True, editable=False)
 

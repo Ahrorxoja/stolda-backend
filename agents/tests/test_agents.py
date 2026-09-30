@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 from agents import bot as agent_bot
 from agents import services
 from agents.models import Agent, AgentEarning, AgentWithdrawal
+from agents.rules import RULES_VERSION
 from menu.billing_ledger import approve_receipt
 from menu.management.commands.telegram_bot import Command as OwnerBotCommand
 from menu.models import Invoice, PaymentReceipt, Restaurant, Subscription
@@ -31,7 +32,14 @@ def receipt_image() -> SimpleUploadedFile:
 
 
 def make_agent(**kwargs) -> Agent:
-    defaults = {"name": "Ali Valiyev", "code": "ALI25", "phone": "+998901112233"}
+    defaults = {
+        "name": "Ali Valiyev",
+        "code": "ALI25",
+        "phone": "+998901112233",
+        # Qoidalarga rozi — alohida testlardan tashqari hammasi shu holatda.
+        "rules_version": RULES_VERSION,
+        "rules_accepted_at": timezone.now(),
+    }
     return Agent.objects.create(**{**defaults, **kwargs})
 
 
@@ -459,6 +467,7 @@ class ApplicationTests(AgentTestCase):
     def apply(self, name="Vali Karimov", note="3 ta tanish restoran bor"):
         self.say("/start")
         self.say(agent_bot.BTN_APPLY)
+        self.say(agent_bot.BTN_ACCEPT)
         self.say(name)
         self.say(contact={"phone_number": "998901234567", "user_id": 555})
         self.say("Toshkent")
@@ -484,6 +493,7 @@ class ApplicationTests(AgentTestCase):
     def test_phone_button_is_offered_and_other_peoples_contacts_refused(self):
         self.say("/start")
         self.say(agent_bot.BTN_APPLY)
+        self.say(agent_bot.BTN_ACCEPT)
         ask = self.say("Vali Karimov")
         self.assertEqual(ask["keyboard"], [[agent_bot.BTN_CONTACT]])
 
@@ -494,6 +504,7 @@ class ApplicationTests(AgentTestCase):
     def test_bad_inputs_are_asked_again(self):
         self.say("/start")
         self.say(agent_bot.BTN_APPLY)
+        self.say(agent_bot.BTN_ACCEPT)
         self.assertIn("to'liq yozing", self.say("A")["text"])
         self.say("Vali Karimov")
         self.assertIn("tugmasini bosing", self.say("salom")["text"])
@@ -640,4 +651,87 @@ class ReminderTests(AgentTestCase):
         self.set_end(20)
 
         self.assertEqual(self.run_daily(), [])
+
+
+class RulesTests(AgentTestCase):
+    """Ariza oldidan to'liq qoidalar; rozilik versiya va sana bilan yoziladi."""
+
+    CHAT = "888"
+
+    def setUp(self):
+        super().setUp()
+        self.bot = FakeChatBot()
+
+    def say(self, text: str, chat_id=None):
+        agent_bot.handle_message(
+            self.bot,
+            {"chat": {"id": chat_id or self.CHAT, "type": "private"}, "from": {"id": 888}, "text": text},
+        )
+        return self.bot.sent[-1]
+
+    def test_apply_shows_full_rules_before_the_form(self):
+        self.say("/start")
+        before = len(self.bot.sent)
+
+        last = self.say(agent_bot.BTN_APPLY)
+
+        parts = [item["text"] for item in self.bot.sent[before:]]
+        self.assertEqual(len(parts), 2)
+        self.assertIn("agent qoidalari", parts[0])
+        self.assertIn("birinchi to'lovidan 50%", parts[0])
+        self.assertIn("Taqiqlanadi", parts[1])
+        self.assertTrue(all(len(part) < 4096 for part in parts))
+        self.assertEqual(last["keyboard"], agent_bot.RULES_KEYBOARD)
+        self.assertFalse(Agent.objects.exists())  # rozi bo'lmaguncha ariza yo'q
+
+    def test_cancel_goes_back_without_applying(self):
+        self.say(agent_bot.BTN_APPLY)
+
+        reply = self.say(agent_bot.BTN_CANCEL)
+
+        self.assertEqual(reply["keyboard"], [[agent_bot.BTN_APPLY]])
+        self.assertFalse(Agent.objects.exists())
+
+    def test_accepting_records_version_and_time_and_starts_form(self):
+        self.say(agent_bot.BTN_APPLY)
+
+        reply = self.say(agent_bot.BTN_ACCEPT)
+
+        agent = Agent.objects.get(telegram_chat_id=self.CHAT)
+        self.assertEqual(agent.rules_version, RULES_VERSION)
+        self.assertIsNotNone(agent.rules_accepted_at)
+        self.assertIn("1/4", reply["text"])
+
+    def test_manually_added_agent_accepts_rules_first(self):
+        agent = make_agent(rules_version="", rules_accepted_at=None)
+
+        shown = self.say(f"/start {agent.invite_token}")
+        self.assertEqual(shown["keyboard"], agent_bot.RULES_KEYBOARD)
+        self.assertEqual(self.say(agent_bot.BTN_BALANCE)["keyboard"], agent_bot.RULES_KEYBOARD)
+
+        welcome = self.say(agent_bot.BTN_ACCEPT)
+
+        agent.refresh_from_db()
+        self.assertEqual(agent.rules_version, RULES_VERSION)
+        self.assertIn("ALI25", welcome["text"])
+        self.assertEqual(welcome["keyboard"], agent_bot.KEYBOARD)
+
+    def test_new_rules_version_asks_again(self):
+        agent = make_agent(telegram_chat_id=self.CHAT)
+        self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
+
+        with patch("agents.rules.RULES_VERSION", "2"), patch("agents.bot.RULES_VERSION", "2"):
+            self.assertEqual(self.say(agent_bot.BTN_BALANCE)["keyboard"], agent_bot.RULES_KEYBOARD)
+            self.say(agent_bot.BTN_ACCEPT)
+            agent.refresh_from_db()
+            self.assertEqual(agent.rules_version, "2")
+            self.assertIn("Balans", self.say(agent_bot.BTN_BALANCE)["text"])
+
+    def test_agent_can_reread_rules(self):
+        make_agent(telegram_chat_id=self.CHAT)
+
+        last = self.say("/qoidalar")
+
+        self.assertIn("Aloqa", last["text"])
+        self.assertEqual(last["keyboard"], agent_bot.KEYBOARD)
 

@@ -25,6 +25,7 @@ from menu.phones import is_valid_phone, normalize_phone
 
 from . import services
 from .models import Agent, AgentEarning
+from .rules import RULES_VERSION, accepted_current, rules_parts
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ STATE_CARD_NUMBER = "card_number"
 STATE_CARD_HOLDER = "card_holder"
 
 BTN_APPLY = "📝 Agent bo'lish"
+BTN_ACCEPT = "✅ Qoidalarga roziman"
+BTN_CANCEL = "❌ Bekor qilish"
+RULES_KEYBOARD = [[BTN_ACCEPT], [BTN_CANCEL]]
 BTN_SKIP = "O'tkazib yuborish"
 BTN_CONTACT = {"text": "📱 Raqamni yuborish", "request_contact": True}
 CITY_KEYBOARD = [["Toshkent", "Samarqand"], ["Buxoro", "Farg'ona"], ["Andijon", "Namangan"]]
@@ -80,7 +84,10 @@ def handle_message(bot, message: dict) -> None:
 
     agent = Agent.objects.filter(telegram_chat_id=chat_id).first()
     if agent is None:
-        if text == BTN_APPLY:
+        if text in (BTN_APPLY, "/qoidalar"):
+            _show_rules(bot, chat_id, RULES_KEYBOARD)
+        elif text == BTN_ACCEPT:
+            # Qoidalarni ko'rib, rozi bo'ldi — ariza shundan boshlanadi.
             _begin_application(bot, chat_id, sender)
         else:
             _guest_welcome(bot, chat_id)
@@ -95,6 +102,14 @@ def handle_message(bot, message: dict) -> None:
         bot.send(chat_id, _PENDING, keyboard=[])
         return
     if not text:
+        return
+    # Qo'lda qo'shilgan agent yoki qoidalar yangilangan — avval rozilik.
+    if not accepted_current(agent):
+        if text == BTN_ACCEPT:
+            _accept_rules(agent)
+            _welcome(bot, agent)
+        else:
+            _show_rules(bot, chat_id, RULES_KEYBOARD)
         return
     # Karta kiritish bosqichi — tugma bosilsa bosqich bekor bo'ladi.
     if agent.bot_state and text not in _BUTTONS:
@@ -148,7 +163,14 @@ def _start(bot, chat_id: str, token: str, sender: dict) -> None:
     if agent.is_pending:
         bot.send(chat_id, _PENDING, keyboard=[])
         return
+    if not accepted_current(agent):
+        _show_rules(bot, chat_id, RULES_KEYBOARD)
+        return
+    _welcome(bot, agent)
 
+
+def _welcome(bot, agent: Agent) -> None:
+    chat_id = agent.telegram_chat_id
     bot.send(
         chat_id,
         f"Assalomu alaykum, <b>{agent.name}</b>! 👋\n\n"
@@ -165,6 +187,20 @@ _PENDING = "⏳ Arizangiz ko'rib chiqilmoqda. Javob shu yerga keladi."
 _REJECTED = "Arizangiz ko'rib chiqilgan, afsuski hozircha qabul qila olmaymiz. Savollar: " + SUPPORT
 
 
+def _show_rules(bot, chat_id: str, keyboard) -> None:
+    """To'liq qoidalar — ikki xabar (Telegram chegarasi), tugmalar oxirgisida."""
+    parts = rules_parts()
+    for part in parts[:-1]:
+        bot.send(chat_id, part)
+    bot.send(chat_id, parts[-1], keyboard=keyboard)
+
+
+def _accept_rules(agent: Agent) -> None:
+    agent.rules_version = RULES_VERSION
+    agent.rules_accepted_at = timezone.now()
+    agent.save(update_fields=["rules_version", "rules_accepted_at"])
+
+
 def _guest_welcome(bot, chat_id: str) -> None:
     field = Agent._meta.get_field
     bot.send(
@@ -176,7 +212,8 @@ def _guest_welcome(bot, chat_id: str) -> None:
         f"• <b>keyingi to'lovlaridan {field('percent').default}%</b> — "
         f"{services.duration(field('months').default)}\n"
         "• pulni istalgan vaqtda kartaga yechib olasiz\n\n"
-        f"Agent bo'lish uchun «{BTN_APPLY}» ni bosing — 1 daqiqa.",
+        f"Agent bo'lish uchun «{BTN_APPLY}» ni bosing: avval qoidalar bilan tanishasiz, "
+        f"keyin qisqa ariza (1 daqiqa).",
         keyboard=[[BTN_APPLY]],
     )
 
@@ -188,6 +225,8 @@ def _begin_application(bot, chat_id: str, sender: dict) -> None:
         telegram_chat_id=chat_id,
         telegram_username=(sender.get("username") or "")[:64],
         bot_state=STATE_APPLY_NAME,
+        rules_version=RULES_VERSION,
+        rules_accepted_at=timezone.now(),
     )
     _ask_next(bot, agent)
 
@@ -377,6 +416,7 @@ def _help(bot, agent: Agent) -> None:
         f"3. To'lov yaqinlashganda yoki kechiksa bot eslatadi — restoranga qo'ng'iroq qilib "
         f"eslatib qo'ying. Restoran to'lab tursa, siz ham har oy daromad olasiz.\n"
         f"4. Balans {services.money(services.MIN_WITHDRAWAL)} dan oshsa — «{BTN_WITHDRAW}».\n\n"
+        f"To'liq qoidalar: /qoidalar\n"
         f"Savollar: {SUPPORT}",
         keyboard=KEYBOARD,
     )
@@ -399,6 +439,7 @@ _COMMANDS = {
     "/yechish": _withdraw,
     "/karta": _card,
     "/yordam": _help,
+    "/qoidalar": lambda bot, agent: _show_rules(bot, agent.telegram_chat_id, KEYBOARD),
     "/help": _help,
 }
 
