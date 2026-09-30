@@ -56,11 +56,12 @@ class Agent(models.Model):
     rejected_at = models.DateTimeField("Rad etilgan", null=True, blank=True, editable=False)
 
     # Shartlar — hammaga bir xil sukut, kerak bo'lsa agentga alohida.
-    percent = models.PositiveSmallIntegerField("Har to'lovdan, %", default=20)
+    percent = models.PositiveSmallIntegerField("Keyingi to'lovlardan, %", default=20)
     months = models.PositiveSmallIntegerField(
-        "Necha oy davomida", default=12, help_text="Restoranning birinchi to'lovidan boshlab."
+        "Necha oy davomida", default=12, help_text="Keyingi to'lovlar — restoranning birinchi to'lovidan boshlab shuncha oy."
     )
-    first_bonus = models.PositiveIntegerField("Birinchi to'lov bonusi, so'm", default=30_000)
+    #: Restoranning birinchi to'lovidan (oylik yoki yillik — farqi yo'q).
+    first_percent = models.PositiveSmallIntegerField("Birinchi to'lovdan, %", default=50)
 
     # Telegram — agent taklif havolasini bosganda ulanadi.
     invite_token = models.CharField(max_length=32, unique=True, default=_invite_token, editable=False)
@@ -138,8 +139,8 @@ class AgentEarning(models.Model):
     """Agentga tegishli summa — restoran to'lovi tasdiqlanganda yoziladi."""
 
     class Kind(models.TextChoices):
-        BONUS = "bonus", "Birinchi to'lov bonusi"
-        PERCENT = "percent", "Foiz"
+        FIRST = "first", "Birinchi to'lov"
+        PERCENT = "percent", "Keyingi to'lov"
 
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="earnings")
     restaurant = models.ForeignKey(

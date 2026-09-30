@@ -42,7 +42,7 @@ class AgentAdmin(admin.ModelAdmin):
         (None, {"fields": ("name", "phone", "city", "code", "is_active")}),
         ("Ariza", {"fields": ("note", "applied_at", "approved_at", "rejected_at")}),
         ("Havolalar", {"fields": ("links", "telegram")}),
-        ("Shartlar", {"fields": ("percent", "months", "first_bonus")}),
+        ("Shartlar", {"fields": ("first_percent", "percent", "months")}),
         ("Karta", {"fields": ("card_number", "card_holder")}),
         ("Balans", {"fields": ("balance_info", "created_at")}),
     )

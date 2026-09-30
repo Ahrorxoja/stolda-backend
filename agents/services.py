@@ -33,6 +33,15 @@ def money(amount: int) -> str:
     return f"{amount:,}".replace(",", " ") + " so'm"
 
 
+def terms(agent: Agent) -> str:
+    """Shartlar matni — bot va xabarlarda bir xil."""
+    return (
+        f"Restoran sizning havolangiz yoki kodingiz bilan ro'yxatdan o'tsa, uning "
+        f"<b>birinchi to'lovidan {agent.first_percent}%</b> (oylik yoki yillik) va "
+        f"<b>keyingi to'lovlaridan {agent.percent}%</b> ({agent.months} oy davomida) olasiz."
+    )
+
+
 def agent_link(agent: Agent) -> str:
     return f"{settings.SITE_URL}/?agent={agent.code}"
 
@@ -141,9 +150,7 @@ def approve_application(agent: Agent) -> bool:
         fresh,
         f"🎉 Tabriklaymiz, <b>{fresh.name}</b>! Arizangiz qabul qilindi — siz stolda.uz agentisiz.\n\n"
         f"Kodingiz: <b>{fresh.code}</b>\n"
-        f"Restoran sizning havolangiz yoki kodingiz bilan ro'yxatdan o'tsa, uning har to'lovidan "
-        f"<b>{fresh.percent}%</b> ({fresh.months} oy davomida) va birinchi to'lov uchun "
-        f"<b>{money(fresh.first_bonus)}</b> bonus olasiz.\n\n"
+        f"{terms(fresh)}\n\n"
         f"Boshlash uchun «🔗 Havolam» ni bosing.",
         main_keyboard=True,
     )
@@ -189,7 +196,7 @@ def attach(restaurant, agent: Agent) -> None:
 def on_invoice_paid(invoice) -> list[AgentEarning]:
     """To'lov tasdiqlanganda chaqiriladi (`menu.billing_ledger.record_payment`).
 
-    Idempotent: bir to'lovdan bir turdagi daromad bir marta yoziladi.
+    Idempotent: bir to'lovdan daromad bir marta yoziladi.
     """
     subscription = invoice.subscription
     restaurant = subscription.restaurant
@@ -204,38 +211,39 @@ def on_invoice_paid(invoice) -> list[AgentEarning]:
     )
     if first is None:
         return []
-    window_end = first.paid_at + timedelta(days=agent.months * DAYS_PER_MONTH)
-    if invoice.paid_at > window_end:
+
+    # Birinchi to'lov (oylik yoki yillik) — `first_percent`; keyingilari —
+    # `percent`, faqat birinchi to'lovdan keyingi `months` oy ichida.
+    if invoice.pk == first.pk:
+        kind, percent = AgentEarning.Kind.FIRST, agent.first_percent
+    else:
+        window_end = first.paid_at + timedelta(days=agent.months * DAYS_PER_MONTH)
+        if invoice.paid_at > window_end:
+            return []
+        kind, percent = AgentEarning.Kind.PERCENT, agent.percent
+
+    amount = invoice.amount * percent // 100
+    if amount <= 0:
+        return []
+    earning, was_created = AgentEarning.objects.get_or_create(
+        invoice=invoice,
+        kind=kind,
+        defaults={
+            "agent": agent,
+            "restaurant": restaurant,
+            "restaurant_name": restaurant.name,
+            "amount": amount,
+        },
+    )
+    if not was_created:
         return []
 
-    created = []
-    rows = [(AgentEarning.Kind.PERCENT, invoice.amount * agent.percent // 100)]
-    if invoice.pk == first.pk and agent.first_bonus:
-        rows.append((AgentEarning.Kind.BONUS, agent.first_bonus))
-    for kind, amount in rows:
-        if amount <= 0:
-            continue
-        earning, was_created = AgentEarning.objects.get_or_create(
-            invoice=invoice,
-            kind=kind,
-            defaults={
-                "agent": agent,
-                "restaurant": restaurant,
-                "restaurant_name": restaurant.name,
-                "amount": amount,
-            },
-        )
-        if was_created:
-            created.append(earning)
-
-    if created:
-        total = sum(earning.amount for earning in created)
-        notify_agent(
-            agent,
-            f"💰 <b>{restaurant.name}</b> to'lov qildi — sizga <b>+{money(total)}</b>.\n"
-            f"Balans: {money(balance(agent).available)}",
-        )
-    return created
+    notify_agent(
+        agent,
+        f"💰 <b>{restaurant.name}</b> to'lov qildi — sizga <b>+{money(amount)}</b>.\n"
+        f"Balans: {money(balance(agent).available)}",
+    )
+    return [earning]
 
 
 # ── Balans ─────────────────────────────────────────────────────────────

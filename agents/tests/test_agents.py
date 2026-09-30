@@ -147,37 +147,37 @@ class EarningTests(AgentTestCase):
     def amounts(self):
         return sorted(AgentEarning.objects.values_list("kind", "amount"))
 
-    def test_first_monthly_payment_gives_bonus_and_percent(self):
+    def test_first_monthly_payment_gives_half(self):
         self.pay(self.restaurant)
 
-        self.assertEqual(self.amounts(), [("bonus", 30_000), ("percent", 19_800)])
-        self.assertIn("+49 800 so'm", self.agent_bot.texts(AGENT_CHAT_ID)[-1])
+        self.assertEqual(self.amounts(), [("first", 49_500)])
+        self.assertIn("+49 500 so'm", self.agent_bot.texts(AGENT_CHAT_ID)[-1])
 
-    def test_second_payment_gives_only_percent(self):
+    def test_next_payments_give_twenty_percent(self):
         self.pay(self.restaurant)
         self.pay(self.restaurant)
+        self.pay(self.restaurant)
 
-        self.assertEqual(
-            sorted(AgentEarning.objects.values_list("kind", flat=True)), ["bonus", "percent", "percent"]
-        )
+        self.assertEqual(self.amounts(), [("first", 49_500), ("percent", 19_800), ("percent", 19_800)])
 
-    def test_yearly_payment(self):
+    def test_first_yearly_payment_also_gives_half(self):
         self.pay(self.restaurant, period="year")
 
-        self.assertEqual(self.amounts(), [("bonus", 30_000), ("percent", 198_000)])
+        self.assertEqual(self.amounts(), [("first", 495_000)])
 
     def test_approving_twice_does_not_double(self):
         invoice = self.pay(self.restaurant)
         services.on_invoice_paid(invoice)
 
-        self.assertEqual(AgentEarning.objects.count(), 2)
+        self.assertEqual(AgentEarning.objects.count(), 1)
 
-    def test_nothing_after_the_agreed_months(self):
+    def test_next_payments_only_within_the_agreed_months(self):
         start = timezone.now()
         self.pay(self.restaurant, when=start)
+        self.pay(self.restaurant, when=start + timedelta(days=11 * 30))
         self.pay(self.restaurant, when=start + timedelta(days=12 * 30 + 5))
 
-        self.assertEqual(AgentEarning.objects.filter(kind="percent").count(), 1)
+        self.assertEqual(self.amounts(), [("first", 49_500), ("percent", 19_800)])
 
     def test_inactive_agent_earns_nothing(self):
         self.agent.is_active = False
@@ -195,12 +195,13 @@ class EarningTests(AgentTestCase):
         self.assertFalse(AgentEarning.objects.exists())
 
     def test_custom_terms_per_agent(self):
-        self.agent.percent, self.agent.first_bonus = 30, 0
+        self.agent.first_percent, self.agent.percent = 40, 30
         self.agent.save()
 
         self.pay(self.restaurant)
+        self.pay(self.restaurant)
 
-        self.assertEqual(self.amounts(), [("percent", 29_700)])
+        self.assertEqual(self.amounts(), [("first", 39_600), ("percent", 29_700)])
 
 
 # ── Pul yechish ───────────────────────────────────────────────────────
@@ -225,16 +226,16 @@ class WithdrawalTests(AgentTestCase):
             return services.request_withdrawal(self.agent)
 
     def test_request_goes_to_owner_with_full_card_and_buttons(self):
-        self.fund()  # 30 000 + 3 × 19 800 = 89 400 — hali kam
+        self.fund()  # 49 500 + 2 × 19 800 = 89 100 — hali kam
         with self.assertRaises(services.WithdrawalError):
             self.request()
-        self.pay(self.restaurant)  # 109 200
+        self.pay(self.restaurant)  # + 19 800 = 108 900
 
         withdrawal = self.request()
 
-        self.assertEqual(withdrawal.amount, 109_200)
+        self.assertEqual(withdrawal.amount, 108_900)
         self.assertEqual(services.balance(self.agent).available, 0)
-        self.assertEqual(services.balance(self.agent).pending, 109_200)
+        self.assertEqual(services.balance(self.agent).pending, 108_900)
         message = self.owner_bot.sent[-1]
         self.assertIn("8600 1234 5678 9012", message["text"])
         self.assertEqual(
@@ -359,7 +360,7 @@ class AgentBotTests(AgentTestCase):
         services.attach(restaurant, self.agent)
         self.pay(restaurant)
 
-        self.assertIn("49 800 so'm", self.say(agent_bot.BTN_BALANCE)["text"])
+        self.assertIn("49 500 so'm", self.say(agent_bot.BTN_BALANCE)["text"])
         restaurants = self.say(agent_bot.BTN_RESTAURANTS)["text"]
         self.assertIn("Zamin", restaurants)
         self.assertIn("to'layapti", restaurants)

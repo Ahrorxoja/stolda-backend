@@ -152,9 +152,7 @@ def _start(bot, chat_id: str, token: str, sender: dict) -> None:
         chat_id,
         f"Assalomu alaykum, <b>{agent.name}</b>! 👋\n\n"
         f"Siz stolda.uz agentisiz. Kodingiz: <b>{agent.code}</b>\n\n"
-        f"Restoran sizning havolangiz yoki kodingiz bilan ro'yxatdan o'tsa, "
-        f"uning har to'lovidan <b>{agent.percent}%</b> ({agent.months} oy davomida) "
-        f"va birinchi to'lov uchun <b>{services.money(agent.first_bonus)}</b> bonus olasiz.\n\n"
+        f"{services.terms(agent)}\n\n"
         f"Boshlash uchun «{BTN_LINK}» ni bosing.",
         keyboard=KEYBOARD,
     )
@@ -173,8 +171,8 @@ def _guest_welcome(bot, chat_id: str) -> None:
         "Assalomu alaykum! 👋\n\n"
         "<b>stolda.uz</b> — restoran va kafelar uchun QR menyu. Agent sifatida restoranlarni "
         "ulaysiz va ularning har to'lovidan daromad olasiz:\n\n"
-        f"• har to'lovdan <b>{field('percent').default}%</b> — {field('months').default} oy davomida\n"
-        f"• birinchi to'lov uchun <b>{services.money(field('first_bonus').default)}</b> bonus\n"
+        f"• restoranning <b>birinchi to'lovidan {field('first_percent').default}%</b> — oylik yoki yillik\n"
+        f"• <b>keyingi to'lovlaridan {field('percent').default}%</b> — {field('months').default} oy davomida\n"
         "• pulni istalgan vaqtda kartaga yechib olasiz\n\n"
         f"Agent bo'lish uchun «{BTN_APPLY}» ni bosing — 1 daqiqa.",
         keyboard=[[BTN_APPLY]],
