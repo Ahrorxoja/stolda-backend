@@ -21,7 +21,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from menu import qr as qr_codes
-from menu.phones import is_valid_phone, normalize_phone
 
 from . import services
 from .models import Agent, AgentEarning
@@ -47,7 +46,47 @@ BTN_CANCEL = "❌ Bekor qilish"
 RULES_KEYBOARD = [[BTN_ACCEPT], [BTN_CANCEL]]
 BTN_SKIP = "O'tkazib yuborish"
 BTN_CONTACT = {"text": "📱 Raqamni yuborish", "request_contact": True}
-CITY_KEYBOARD = [["Toshkent", "Samarqand"], ["Buxoro", "Farg'ona"], ["Andijon", "Namangan"]]
+#: O'zbekistonning barcha hududlari — 12 viloyat, Qoraqalpog'iston, Toshkent shahri.
+REGIONS = [
+    "Toshkent shahri",
+    "Toshkent viloyati",
+    "Andijon",
+    "Buxoro",
+    "Farg'ona",
+    "Jizzax",
+    "Xorazm",
+    "Namangan",
+    "Navoiy",
+    "Qashqadaryo",
+    "Qoraqalpog'iston",
+    "Samarqand",
+    "Sirdaryo",
+    "Surxondaryo",
+]
+REGION_KEYBOARD = [REGIONS[i : i + 2] for i in range(0, len(REGIONS), 2)]
+
+
+def _match_region(text: str) -> str:
+    """Tugmadan yoki qo'lda yozilgan (katta-kichik harf, apostrof farqi bilan)."""
+    key = re.sub(r"[ʻʼ'`’‘\s]", "", text).lower()
+    for region in REGIONS:
+        if re.sub(r"['\s]", "", region).lower() == key:
+            return region
+    return ""
+
+
+UZ_PHONE = re.compile(r"^998[1-9]\d{8}$")
+
+
+def _uz_phone(value: str) -> str:
+    """To'liq O'zbekiston raqami → `+998901234567`, aks holda bo'sh.
+
+    `90 123 45 67`, `+998 90 123-45-67`, `998901234567` — hammasi qabul.
+    """
+    digits = re.sub(r"\D", "", value or "")
+    if len(digits) == 9:
+        digits = "998" + digits
+    return f"+{digits}" if UZ_PHONE.match(digits) else ""
 
 STATE_APPLY_NAME = "apply_name"
 STATE_APPLY_PHONE = "apply_phone"
@@ -239,11 +278,12 @@ def _ask_next(bot, agent: Agent) -> None:
     elif agent.bot_state == STATE_APPLY_PHONE:
         bot.send(
             chat_id,
-            "2/4. Telefon raqamingizni yuboring — pastdagi tugmani bosing 👇",
+            "2/4. Telefon raqamingizni yozing, masalan: <b>+998 90 123 45 67</b>\n"
+            "yoki pastdagi «📱 Raqamni yuborish» tugmasini bosing 👇",
             keyboard=[[BTN_CONTACT]],
         )
     elif agent.bot_state == STATE_APPLY_CITY:
-        bot.send(chat_id, "3/4. Qaysi shahardasiz? Tanlang yoki yozing:", keyboard=CITY_KEYBOARD)
+        bot.send(chat_id, "3/4. Qaysi viloyatda ishlaysiz? Pastdan tanlang 👇", keyboard=REGION_KEYBOARD)
     elif agent.bot_state == STATE_APPLY_NOTE:
         bot.send(
             chat_id,
@@ -270,20 +310,33 @@ def _continue_application(bot, agent: Agent, text: str, contact: dict | None, se
             if contact.get("user_id") and sender.get("id") and contact["user_id"] != sender["id"]:
                 bot.send(chat_id, "Iltimos, o'zingizning raqamingizni yuboring 👇", keyboard=[[BTN_CONTACT]])
                 return
-            phone = normalize_phone(contact.get("phone_number", ""))
-        elif is_valid_phone(text):
-            phone = normalize_phone(text)
+            phone = _uz_phone(contact.get("phone_number", ""))
+            if not phone:
+                bot.send(
+                    chat_id,
+                    "Bu O'zbekiston raqami emas. O'zbekistondagi raqamingizni yozing, "
+                    "masalan: +998 90 123 45 67",
+                    keyboard=[[BTN_CONTACT]],
+                )
+                return
         else:
-            bot.send(chat_id, "Pastdagi «📱 Raqamni yuborish» tugmasini bosing 👇", keyboard=[[BTN_CONTACT]])
-            return
+            phone = _uz_phone(text)
+            if not phone:
+                bot.send(
+                    chat_id,
+                    "❗️ Raqam noto'g'ri. To'liq yozing, masalan: <b>+998 90 123 45 67</b>\n"
+                    "yoki pastdagi «📱 Raqamni yuborish» tugmasini bosing 👇",
+                    keyboard=[[BTN_CONTACT]],
+                )
+                return
         agent.phone, agent.bot_state = phone[:20], STATE_APPLY_CITY
 
     elif state == STATE_APPLY_CITY:
-        city = " ".join(text.split())[:60]
-        if len(city) < 2:
-            bot.send(chat_id, "Shahar nomini yozing:", keyboard=CITY_KEYBOARD)
+        region = _match_region(text)
+        if not region:
+            bot.send(chat_id, "Viloyatni pastdagi tugmalardan tanlang 👇", keyboard=REGION_KEYBOARD)
             return
-        agent.city, agent.bot_state = city, STATE_APPLY_NOTE
+        agent.city, agent.bot_state = region, STATE_APPLY_NOTE
 
     elif state == STATE_APPLY_NOTE:
         agent.note = "" if text == BTN_SKIP else " ".join(text.split())[:300]

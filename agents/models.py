@@ -46,7 +46,8 @@ class Agent(models.Model):
     is_active = models.BooleanField(
         "Faol", default=True, help_text="O'chirilsa yangi restoran ham, yangi daromad ham yozilmaydi."
     )
-    city = models.CharField("Shahar", max_length=60, blank=True)
+    #: Viloyat (botdagi ro'yxatdan) — `agents/bot.py: REGIONS`.
+    city = models.CharField("Viloyat", max_length=60, blank=True)
     #: Arizadagi "restoranlar bilan tanishlaringiz bormi?" javobi.
     note = models.CharField("Ariza izohi", max_length=300, blank=True)
     #: Bot orqali ariza — `applied_at` bor, `approved_at`/`rejected_at` hali yo'q.

@@ -470,7 +470,7 @@ class ApplicationTests(AgentTestCase):
         self.say(agent_bot.BTN_ACCEPT)
         self.say(name)
         self.say(contact={"phone_number": "998901234567", "user_id": 555})
-        self.say("Toshkent")
+        self.say("Toshkent shahri")
         return self.say(note)
 
     def agent(self) -> Agent:
@@ -484,7 +484,7 @@ class ApplicationTests(AgentTestCase):
         self.assertTrue(agent.is_pending)
         self.assertFalse(agent.is_active)
         self.assertIsNone(agent.code)
-        self.assertEqual((agent.name, agent.phone, agent.city), ("Vali Karimov", "+998901234567", "Toshkent"))
+        self.assertEqual((agent.name, agent.phone, agent.city), ("Vali Karimov", "+998901234567", "Toshkent shahri"))
         owner = self.owner_bot.sent[-1]
         self.assertIn("Vali Karimov", owner["text"])
         self.assertIn("+998901234567", owner["text"])
@@ -510,6 +510,49 @@ class ApplicationTests(AgentTestCase):
         self.assertIn("tugmasini bosing", self.say("salom")["text"])
         self.say("+998 90 123 45 67")  # qo'lda yozilgan to'g'ri raqam ham qabul
         self.assertEqual(self.agent().phone, "+998901234567")
+
+    def to_phone_step(self):
+        self.say("/start")
+        self.say(agent_bot.BTN_APPLY)
+        self.say(agent_bot.BTN_ACCEPT)
+        return self.say("Vali Karimov")
+
+    def test_phone_can_be_typed_and_is_validated(self):
+        ask = self.to_phone_step()
+        self.assertIn("yozing", ask["text"])  # tugmadan tashqari yozish ham mumkin
+
+        for wrong in ("12345", "+7 916 123 45 67", "998 00 123 45 67", "+998 90 123 45 6", "salom"):
+            with self.subTest(wrong=wrong):
+                self.assertIn("Raqam noto'g'ri", self.say(wrong)["text"])
+        self.assertEqual(self.agent().phone, "")
+
+        self.say("90 123-45-67")
+        self.assertEqual(self.agent().phone, "+998901234567")
+
+    def test_foreign_contact_is_refused(self):
+        self.to_phone_step()
+
+        reply = self.say(contact={"phone_number": "79161234567", "user_id": 555})
+
+        self.assertIn("O'zbekiston raqami emas", reply["text"])
+        self.assertEqual(self.agent().phone, "")
+
+    def test_all_fourteen_regions_are_offered(self):
+        self.to_phone_step()
+        ask = self.say("+998 90 123 45 67")
+
+        regions = [name for row in ask["keyboard"] for name in row]
+        self.assertEqual(len(regions), 14)
+        self.assertIn("Qoraqalpog'iston", regions)
+        self.assertIn("Toshkent viloyati", regions)
+
+    def test_region_must_come_from_the_list(self):
+        self.to_phone_step()
+        self.say("+998 90 123 45 67")
+
+        self.assertIn("tugmalardan tanlang", self.say("Moskva")["text"])
+        self.say("farg‘ona")  # boshqa apostrof, kichik harf
+        self.assertEqual(self.agent().city, "Farg'ona")
 
     def test_note_can_be_skipped(self):
         self.apply(note=agent_bot.BTN_SKIP)

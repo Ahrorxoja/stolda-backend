@@ -126,7 +126,7 @@ def submit_application(agent: Agent) -> None:
             f"🙋 <b>Yangi agent arizasi</b>\n\n"
             f"Ism: <b>{fresh.name}</b>\n"
             f"Telefon: {fresh.phone or '—'}\n"
-            f"Shahar: {fresh.city or '—'}\n"
+            f"Viloyat: {fresh.city or '—'}\n"
             f"Telegram: {'@' + fresh.telegram_username if fresh.telegram_username else '—'}\n"
             f"Tanishlar: {fresh.note or '—'}"
         )
