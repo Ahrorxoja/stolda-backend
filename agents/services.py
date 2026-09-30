@@ -47,7 +47,8 @@ def duration(months: int) -> str:
 
 
 def agent_link(agent: Agent) -> str:
-    return f"{settings.SITE_URL}/?agent={agent.code}"
+    # To'g'ridan-to'g'ri ro'yxatdan o'tishga — restoran egasi shu yerning o'zida Google bilan kiradi.
+    return f"{settings.SITE_URL}/signup?agent={agent.code}"
 
 
 def invite_link(agent: Agent) -> str:

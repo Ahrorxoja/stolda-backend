@@ -1,6 +1,6 @@
 """Savdo agentlari: restoran olib keladi, har to'lovdan foiz oladi.
 
-Oqim: agent o'z havolasi (`stolda.uz/?agent=ALI`) yoki kodini beradi →
+Oqim: agent o'z havolasi (`stolda.uz/signup?agent=ALI`) yoki kodini beradi →
 restoran shu kod bilan ro'yxatdan o'tadi (`Restaurant.agent`) → restoran
 to'lagan har chekdan agentga `AgentEarning` yoziladi → agent botda
 "Pul yechish" ni bosadi (`AgentWithdrawal`) → platforma egasi kartaga
