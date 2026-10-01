@@ -441,3 +441,29 @@ def settle_withdrawal(withdrawal: AgentWithdrawal, *, paid: bool, note: str = ""
 def mask_card(number: str) -> str:
     digits = "".join(ch for ch in number if ch.isdigit())
     return f"•••• {digits[-4:]}" if len(digits) >= 4 else number
+
+
+# ── Restoranlar Telegram'ni ulashi (haftalik eslatma) ──────────────────
+
+
+def remind_telegram() -> int:
+    """Har agentga — Telegram'ini ulamagan restoranlari. Ulamasa to'lov eslatmasini
+    olmaydi va menyu to'xtashi mumkin — agentning ulushi ham shunga bog'liq."""
+    from menu.platform import unlinked_restaurants
+
+    by_agent: dict[int, list[str]] = {}
+    for restaurant in unlinked_restaurants().filter(agent__isnull=False, agent__is_active=True):
+        phone = restaurant.phone or getattr(getattr(restaurant.owner, "profile", None), "contact_phone", "")
+        line = f"• <b>{restaurant.name}</b>" + (f" — 📞 {format_phone(phone)}" if phone else "")
+        by_agent.setdefault(restaurant.agent_id, []).append(line)
+    sent = 0
+    for agent in Agent.objects.filter(pk__in=by_agent).exclude(telegram_chat_id=""):
+        notify_agent(
+            agent,
+            "📲 <b>Telegram'ni ulamagan restoranlaringiz</b>\n\n"
+            "Ulamasa, to'lov eslatmalarini olmaydi va menyusi to'xtab qolishi mumkin — sizning ulushingiz ham. "
+            "Qo'ng'iroq qiling yoki borganingizda yordam bering: admin panel tepasidagi «Telegram'ni ulash» "
+            "(kompyuterda — QR'ni telefon bilan skanerlash).\n\n" + "\n".join(by_agent[agent.pk]),
+        )
+        sent += 1
+    return sent

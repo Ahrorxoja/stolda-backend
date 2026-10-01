@@ -227,3 +227,38 @@ class BotTests(StaffTestCase):
         self.assertIn(("platforma", "Platforma: shu oy raqamlari"), self.bot.commands["42"])
         self.assertNotIn("platforma", [name for name, _ in self.bot.commands[""]])
         self.assertEqual(self.bot.menu_app, ("Ilova", "https://stolda.uz/app"))
+
+
+class TelegramAdoptionTests(StaffTestCase):
+    def test_link_response_has_qr_image(self):
+        data = self.owner_client.post("/api/telegram/link/").json()
+        self.assertTrue(data["qr"].startswith("data:image/png;base64,"))
+
+    def test_platform_lists_unlinked_restaurants(self):
+        from menu import platform
+
+        status = platform.telegram_status()
+        self.assertEqual((status["total"], status["linked"]), (1, 0))
+        self.assertEqual(status["unlinked"][0]["slug"], "zamin")
+
+        self.link_owner("700")
+        status = platform.telegram_status()
+        self.assertEqual((status["linked"], status["unlinked"]), (1, []))
+
+    def test_agents_get_weekly_list_of_unlinked_restaurants(self):
+        from agents.models import Agent
+        from agents.rules import RULES_VERSION
+        from agents.services import remind_telegram
+        from django.utils import timezone
+
+        agent = Agent.objects.create(
+            name="Ali", code="ALI", telegram_chat_id="55", rules_version=RULES_VERSION, rules_accepted_at=timezone.now()
+        )
+        self.restaurant.agent = agent
+        self.restaurant.phone = "+998901112233"
+        self.restaurant.save()
+        agent_bot = FakeChatBot()
+        with patch("agents.services.get_agent_bot", return_value=agent_bot), self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(remind_telegram(), 1)
+        self.assertIn("Zamin", agent_bot.sent[0]["text"])
+        self.assertIn("+998 90 111 22 33", agent_bot.sent[0]["text"])

@@ -51,7 +51,8 @@ class PlatformOverviewTests(TestCase):
 
         first = paid_invoice(self.monthly, 99_000, self.now)
         paid_invoice(self.yearly, 990_000, self.now, period="year")
-        paid_invoice(self.monthly, 99_000, self.now - timedelta(days=40))  # o'tgan oy
+        # O'tgan oyning o'rtasi — "40 kun oldin" oy boshida ikki oy orqaga tushib qolardi.
+        paid_invoice(self.monthly, 99_000, self.now.replace(day=1) - timedelta(days=15))  # o'tgan oy
         AgentEarning.objects.create(
             agent=self.agent, restaurant=self.monthly, restaurant_name="Oylik", invoice=first, kind="first", amount=49_500
         )

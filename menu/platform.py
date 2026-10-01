@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from agents.models import Agent, AgentEarning, AgentWithdrawal, Visit
 
-from .models import Invoice, PaymentReceipt, Restaurant, Subscription
+from .models import Invoice, PaymentReceipt, Restaurant, RestaurantMember, Subscription
 
 SERIES_MONTHS = 12
 
@@ -107,6 +107,7 @@ def overview(year: int, month: int) -> dict:
         )
     agents.sort(key=lambda row: (row["earned_month"], row["paying"], row["visits_month"]), reverse=True)
 
+    telegram = telegram_status()
     pending_withdrawals = AgentWithdrawal.objects.filter(status=AgentWithdrawal.Status.PENDING)
     return {
         "month": f"{year:04d}-{month:02d}",
@@ -150,8 +151,47 @@ def overview(year: int, month: int) -> dict:
             "withdrawals_sum": _sum(pending_withdrawals),
             "receipts": PaymentReceipt.objects.filter(status=PaymentReceipt.Status.PENDING).count(),
             "past_due": statuses.get(Subscription.Status.PAST_DUE, 0),
+            "telegram": len(telegram["unlinked"]),
         },
+        "telegram": telegram,
         "agents": agents,
+    }
+
+
+#: Hali ishlayotgan restoranlar — to'xtatilgan va bekor qilinganlar hisobga kirmaydi.
+LIVE_STATUSES = (Subscription.Status.TRIALING, Subscription.Status.ACTIVE, Subscription.Status.PAST_DUE)
+
+
+def unlinked_restaurants():
+    """Egasi Telegram'ini (@Stoldabot) ulamagan, hali ishlayotgan restoranlar."""
+    linked_owners = RestaurantMember.objects.filter(
+        role=RestaurantMember.Role.OWNER, user__profile__telegram_id__isnull=False
+    ).values("restaurant")
+    return (
+        Restaurant.objects.filter(subscription__status__in=LIVE_STATUSES)
+        .exclude(pk__in=linked_owners)
+        .select_related("owner", "owner__profile", "agent")
+        .order_by("-created_at")
+    )
+
+
+def telegram_status() -> dict:
+    total = Restaurant.objects.filter(subscription__status__in=LIVE_STATUSES).count()
+    unlinked = list(unlinked_restaurants())
+    return {
+        "total": total,
+        "linked": total - len(unlinked),
+        "unlinked": [
+            {
+                "name": restaurant.name,
+                "slug": restaurant.slug,
+                "owner": restaurant.owner.get_username() if restaurant.owner else "",
+                "phone": restaurant.phone
+                or (getattr(getattr(restaurant.owner, "profile", None), "contact_phone", "") or ""),
+                "agent": restaurant.agent.name if restaurant.agent_id else "",
+            }
+            for restaurant in unlinked[:100]
+        ],
     }
 
 

@@ -184,6 +184,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "menu.tasks.send_monthly_report",
         "schedule": crontab(day_of_month=1, hour=9, minute=0),
     },
+    # Agentlarga: Telegram'ni ulamagan restoranlari — har dushanba.
+    "agents-telegram": {
+        "task": "menu.tasks.remind_agents_telegram",
+        "schedule": crontab(day_of_week=1, hour=10, minute=0),
+    },
 }
 
 # Testlar haqiqiy Gemini API'ga chiqmasligi uchun.

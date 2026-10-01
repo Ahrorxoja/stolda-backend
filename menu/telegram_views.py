@@ -32,6 +32,18 @@ class TelegramAuthView(APIView):
         return Response(telegram_link.authenticate(tg_user, payload, bool(request.data.get("confirm"))))
 
 
+def _qr_data_url(url: str) -> str:
+    """Kompyuterda: telefon kamerasi bilan skanerlansa, Telegram telefonda ochiladi."""
+    import base64
+    import io
+
+    from . import qr as qr_codes
+
+    buffer = io.BytesIO()
+    qr_codes.render(url, center="icon", box_size=8).save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
 class TelegramLinkView(APIView):
     """`GET` — holat, `POST` — ulash havolasi (10 daqiqa), `DELETE` — uzish."""
 
@@ -51,7 +63,10 @@ class TelegramLinkView(APIView):
 
     def post(self, request):
         token = telegram_link.new_link_token(request.user)
-        return Response({"url": token.url, "expires_at": token.expires_at}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"url": token.url, "qr": _qr_data_url(token.url), "expires_at": token.expires_at},
+            status=status.HTTP_201_CREATED,
+        )
 
     def delete(self, request):
         telegram_link.unlink(request.user)

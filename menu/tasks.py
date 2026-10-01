@@ -298,3 +298,11 @@ def send_monthly_report() -> None:
     except TelegramError as error:
         logger.warning("Oylik hisobot yuborilmadi: %s", error)
 
+
+
+@shared_task
+def remind_agents_telegram() -> int:
+    """Har dushanba: agentlarga Telegram'ni ulamagan restoranlari ro'yxati."""
+    from agents.services import remind_telegram
+
+    return remind_telegram()
