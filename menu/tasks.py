@@ -172,6 +172,8 @@ def process_subscriptions() -> dict:
     now = timezone.now()
     today = now.date()
     reminder_date = today + timedelta(days=3)
+    #: Ikkinchi eslatma — muddat tugashidan bir kun oldin.
+    last_day = today + timedelta(days=1)
     stats = {"reminded": 0, "past_due": 0, "suspended": 0}
     #: Kun oxirida platforma egasiga bitta umumiy xabar bo'lib boradi.
     digest: list[str] = []
@@ -239,6 +241,11 @@ def process_subscriptions() -> dict:
             digest.append(f"🔔 {_label(subscription)} — 3 kundan keyin tugaydi")
             trial = subscription.status == Subscription.Status.TRIALING
             tell_agent(subscription, "trial_soon" if trial else "due_soon", end_date)
+            stats["reminded"] += 1
+        elif end_date.date() == last_day:
+            digest.append(f"🔔 {_label(subscription)} — ertaga tugaydi")
+            trial = subscription.status == Subscription.Status.TRIALING
+            tell_agent(subscription, "trial_tomorrow" if trial else "due_tomorrow", end_date)
             stats["reminded"] += 1
         elif end_date <= now:
             subscription.status = Subscription.Status.PAST_DUE

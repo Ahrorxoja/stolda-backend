@@ -283,6 +283,8 @@ def on_invoice_paid(invoice) -> list[AgentEarning]:
 REMINDERS = {
     "trial_soon": "⏰ <b>{name}</b> — bepul sinov {date} da tugaydi. Birinchi to'lovni eslatib qo'ying.",
     "due_soon": "⏰ <b>{name}</b> — to'lov muddati {date} da tugaydi. Eslatib qo'ying.",
+    "trial_tomorrow": "❗️ <b>{name}</b> — bepul sinov ertaga ({date}) tugaydi. Bugun qo'ng'iroq qiling.",
+    "due_tomorrow": "❗️ <b>{name}</b> — to'lov muddati ertaga ({date}) tugaydi. Bugun qo'ng'iroq qiling.",
     "past_due": "💳 <b>{name}</b> — to'lov muddati o'tdi. 7 kun ichida to'lasa, menyu to'xtamaydi.",
     "suspended": "⛔️ <b>{name}</b> — to'lanmagani uchun menyu to'xtatildi. To'lasa darhol tiklanadi.",
 }

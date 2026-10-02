@@ -342,6 +342,22 @@ class DailyReminderTests(TestCase):
         self.assertIn(self.restaurant.name, text)
         self.assertIn("3 kundan keyin tugaydi", text)
 
+    def test_trial_ending_tomorrow_reminds_owner_again(self):
+        from menu.models import Profile
+        from telegrambot import FakeChatBot
+
+        Profile.objects.update_or_create(user=self.restaurant.owner, defaults={"telegram_id": "777"})
+        self.subscription.trial_ends_at = timezone.now() + timedelta(days=1)
+        self.subscription.save(update_fields=["trial_ends_at"])
+
+        owner_bot = FakeChatBot()
+        with patch("menu.notify.get_restaurant_bot", return_value=owner_bot), self.captureOnCommitCallbacks(execute=True):
+            bot = self.run_task()
+
+        self.assertIn("ertaga tugaydi", bot.sent[0]["text"])
+        self.assertEqual(owner_bot.sent[0]["chat_id"], "777")
+        self.assertIn("ertaga", owner_bot.sent[0]["text"])
+
     def test_suspension_is_reported(self):
         self.subscription.status = Subscription.Status.PAST_DUE
         self.subscription.grace_ends_at = timezone.now() - timedelta(hours=1)

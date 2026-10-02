@@ -175,9 +175,10 @@ from celery.schedules import crontab  # noqa: E402
 # Production'da alohida `beat` jarayoni kerak (`deploy/docker-compose.prod.yml`),
 # aks holda bu jadval hech qachon ishga tushmaydi.
 CELERY_BEAT_SCHEDULE = {
+    # Ertalab 10:00 (Toshkent) — eslatmalar tunda emas, ish vaqtida kelsin.
     "process-subscriptions": {
         "task": "menu.tasks.process_subscriptions",
-        "schedule": crontab(hour=3, minute=0),
+        "schedule": crontab(hour=10, minute=0),
     },
     # O'tgan oy hisoboti — har oyning 1-sanasi ertalab.
     "monthly-report": {

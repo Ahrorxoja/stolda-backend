@@ -65,6 +65,10 @@ SUBSCRIPTION_TEXTS = {
     "trial_soon": "⏰ <b>{name}</b>: bepul sinov {date} da tugaydi. Menyu to'xtamasligi uchun to'lovni qiling — "
     "ilovadagi «To'lov» bo'limida yoki admin panelda.",
     "due_soon": "⏰ <b>{name}</b>: to'lov muddati {date} da tugaydi. Oldindan to'lab qo'ying.",
+    "trial_tomorrow": "❗️ <b>{name}</b>: bepul sinov <b>ertaga</b> ({date}) tugaydi. Menyu to'xtamasligi uchun bugun to'lang — "
+    "ilovadagi «To'lov» bo'limida.",
+    "due_tomorrow": "❗️ <b>{name}</b>: to'lov muddati <b>ertaga</b> ({date}) tugaydi. Bugun to'lab qo'ying — "
+    "ilovadagi «To'lov» bo'limida.",
     "past_due": "💳 <b>{name}</b>: to'lov muddati o'tdi. 7 kun ichida to'lasangiz, menyu to'xtamaydi.",
     "suspended": "⛔️ <b>{name}</b>: to'lanmagani uchun menyu to'xtatildi. To'lov qilinishi bilan darhol tiklanadi.",
 }
