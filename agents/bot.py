@@ -49,6 +49,17 @@ BTN_APP = "📱 Ilovani ochish"
 
 MENU_APP_LABEL = "Ilova"
 
+#: Bot profili: "About" (120 belgi) va bo'sh chatdagi tavsif (512).
+DESCRIPTION_SHORT = "stolda.uz agentlari boti: restoranlarni ulang, joylar jurnali, daromad va pul yechish."
+DESCRIPTION = (
+    "Salom! Bu stolda.uz savdo agentlari boti.\n\n"
+    "💰 Restoran ulang — birinchi to'lovidan 50%, keyingilaridan 20%.\n"
+    "📱 «Ilova»: joy yozish, borilgan joylar jurnali, restoranlaringiz, daromad.\n"
+    "📘 Qo'llanma: «❓ Yordam» — PDF bilan.\n\n"
+    "Agent bo'lish: /start → «📝 Agent bo'lish» → qoidalar → ariza.\n"
+    "Savollar: @aha_daragoy"
+)
+
 
 def _app_url() -> str:
     """Mini App manzili — Telegram faqat HTTPS'ni qabul qiladi (localda bo'sh)."""

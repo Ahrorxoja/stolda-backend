@@ -66,6 +66,10 @@ class ChatBot(Protocol):
         """Fayl (masalan PDF qo'llanma)."""
         ...
 
+    def set_descriptions(self, short: str, full: str, language: str = "") -> None:
+        """Bot profilidagi "About" (`short`, 120 belgi) va bo'sh chatdagi tavsif (`full`, 512)."""
+        ...
+
     def set_menu_app(self, label: str, url: str) -> None:
         """Yozish maydoni yonidagi menyu tugmasi — Mini App'ni ochadi (hamma chatlar uchun)."""
         ...

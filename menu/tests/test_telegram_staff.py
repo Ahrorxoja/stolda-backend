@@ -262,3 +262,11 @@ class TelegramAdoptionTests(StaffTestCase):
             self.assertEqual(remind_telegram(), 1)
         self.assertIn("Zamin", agent_bot.sent[0]["text"])
         self.assertIn("+998 90 111 22 33", agent_bot.sent[0]["text"])
+
+
+class BotTextsTests(StaffTestCase):
+    def test_setup_sets_descriptions_in_three_languages_and_guide(self):
+        tgbot.setup(self.bot)
+        self.assertEqual(set(self.bot.descriptions), {"", "ru", "en"})
+        tgbot.handle_message(self.bot, {"chat": {"id": "1", "type": "private"}, "text": "/yordam"})
+        self.assertIn("Stop-list", self.bot.sent[-1]["text"])

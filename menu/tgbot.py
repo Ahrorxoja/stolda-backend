@@ -27,17 +27,65 @@ COMMANDS = [
     ("start", "Boshlash"),
     ("ilova", "Restoran ilovasini ochish"),
     ("menyu", "Menyu havolasi"),
-    ("yordam", "Yordam"),
+    ("yordam", "Qo'llanma va yordam"),
 ]
 #: Faqat platforma egasining chatida ko'rinadi (Telegram "scope" bilan).
 ADMIN_COMMANDS = COMMANDS + [("platforma", "Platforma: shu oy raqamlari")]
 MENU_APP_LABEL = "Ilova"
 SUPPORT = "@aha_daragoy"
 
+#: Bot profili: "About" (120 belgi) va bo'sh chatdagi tavsif (512). Til — Telegram tili bo'yicha.
+DESCRIPTIONS = {
+    "": (
+        "stolda.uz — restoran va kafelar uchun QR menyu. Menyu, stop-list, narx va to'lovni shu yerdan boshqaring.",
+        "Salom! Bu stolda.uz boti — restoran va kafelar uchun QR menyu.\n\n"
+        "📱 «Ilova» tugmasi: menyu va stop-list, narxlar, yangi taom, kategoriyalar, statistika, xodimlar, to'lov.\n"
+        "🔔 Xabarlar: to'lov muddati, chek tasdiqlanishi, xodimlar o'zgarishlari.\n\n"
+        "Ulash: admin panel → «Telegram'ni ulash» yoki egasidan taklif havolasi.\n"
+        "Yangi restoran: stolda.uz/signup\n"
+        f"Yordam: {SUPPORT}",
+    ),
+    "ru": (
+        "stolda.uz — QR-меню для ресторанов и кафе. Меню, стоп-лист, цены и оплата — прямо здесь.",
+        "Здравствуйте! Это бот stolda.uz — QR-меню для ресторанов и кафе.\n\n"
+        "📱 Кнопка «Ilova»: меню и стоп-лист, цены, новые блюда, категории, статистика, сотрудники, оплата.\n"
+        "🔔 Уведомления: срок оплаты, подтверждение чека, изменения сотрудников.\n\n"
+        "Подключение: админ-панель → «Подключить Telegram» или ссылка-приглашение от владельца.\n"
+        "Новый ресторан: stolda.uz/signup\n"
+        f"Помощь: {SUPPORT}",
+    ),
+    "en": (
+        "stolda.uz — QR menus for restaurants and cafés. Manage the menu, stop list, prices and payments here.",
+        "Hi! This is the stolda.uz bot — QR menus for restaurants and cafés.\n\n"
+        "📱 “Ilova” button: menu & stop list, prices, new dishes, categories, stats, staff, payments.\n"
+        "🔔 Notifications: payment due dates, receipt approval, staff changes.\n\n"
+        "Connect: admin panel → “Connect Telegram”, or an invite link from the owner.\n"
+        "New restaurant: stolda.uz/signup\n"
+        f"Help: {SUPPORT}",
+    ),
+}
+
+#: /yordam — qisqa qo'llanma: eng ko'p kerak bo'ladigan ishlar qadamma-qadam.
+GUIDE = (
+    "📘 <b>Qanday ishlatiladi</b>\n\n"
+    "<b>1. Ilovani ochish</b> — pastdagi «Ilova» tugmasi.\n\n"
+    "<b>2. Stop-list</b> — Menyu → taom yonidagi tugma: «Bor» / «Tugadi». Tugagan taom mijozga ko'rinmaydi.\n\n"
+    "<b>3. Narxni o'zgartirish</b> — narx ustiga bosing → yangi narx → ✓.\n\n"
+    "<b>4. Yangi taom</b> — «+ Taom» → rasm, nom, narx → «Saqlash». Boshqa tillarga o'zi tarjima qilinadi.\n\n"
+    "<b>5. Kategoriyalar va tartib</b> — Menyu → «Kategoriyalar»; taomlar tartibi — kategoriyani tanlab «Tartiblash».\n\n"
+    "<b>6. Xodim qo'shish</b> — Restoran → «Admin qo'shish» → ism va ruxsatlar → havolani xodimga yuboring.\n\n"
+    "<b>7. To'lov</b> — Restoran → To'lov: ko'rsatilgan kartaga o'tkazing va chek rasmini yuklang. Tasdiqlansa, shu yerga xabar keladi.\n\n"
+    "<b>8. Statistika</b> — QR skanerlar va eng ko'p ko'rilgan taomlar.\n\n"
+    "/menyu — menyungiz havolasi.\n"
+    f"Savollar: {SUPPORT}"
+)
+
 
 def setup(bot) -> None:
     """Bot ishga tushganda: buyruqlar ro'yxati va menyu tugmasi (Mini App)."""
     try:
+        for language, (short, full) in DESCRIPTIONS.items():
+            bot.set_descriptions(short, full, language)
         bot.set_commands(COMMANDS)
         if settings.TELEGRAM_ADMIN_CHAT_ID:
             bot.set_commands(ADMIN_COMMANDS, chat_id=str(settings.TELEGRAM_ADMIN_CHAT_ID))
@@ -127,15 +175,8 @@ def handle_message(bot, message: dict) -> None:
             return
         bot.send(chat_id, f"🍽 <b>{member.restaurant.name}</b> menyusi:\n{settings.SITE_URL}/{member.restaurant.slug}")
         return
-    if command in ("/yordam", "/help"):
-        bot.send(
-            chat_id,
-            "<b>stolda.uz boti</b>\n\n"
-            "• «Ilova» tugmasi — stop-list, narx, taom qo'shish, statistika, to'lov.\n"
-            "• /menyu — menyungiz havolasi.\n"
-            "• To'lov muddati, chek tasdiqlanishi va xodimlar o'zgarishlari haqida xabar shu yerga keladi.\n\n"
-            f"Savollar: {SUPPORT}",
-        )
+    if command in ("/yordam", "/help", "/qollanma"):
+        bot.send(chat_id, GUIDE)
         return
     bot.send(chat_id, "Bunday buyruq yo'q. /yordam")
 

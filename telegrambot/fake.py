@@ -77,6 +77,9 @@ class FakeChatBot:
         self.sent.append({"chat_id": str(chat_id), "document": filename, "caption": caption})
         return message_id
 
+    def set_descriptions(self, short: str, full: str, language: str = "") -> None:
+        self.descriptions = {**getattr(self, "descriptions", {}), language: (short, full)}
+
     def set_menu_app(self, label: str, url: str) -> None:
         self.menu_app = (label, url)
 

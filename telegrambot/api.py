@@ -210,6 +210,11 @@ class TelegramChatBot(TelegramBot):
         )
         return str(result.get("message_id", ""))
 
+    def set_descriptions(self, short: str, full: str, language: str = "") -> None:
+        extra = {"language_code": language} if language else {}
+        self._call("setMyShortDescription", data={"short_description": short[:120], **extra})
+        self._call("setMyDescription", data={"description": full[:512], **extra})
+
     def set_menu_app(self, label: str, url: str) -> None:
         self._call(
             "setChatMenuButton",
