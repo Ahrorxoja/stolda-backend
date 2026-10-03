@@ -70,3 +70,33 @@ Django admin: `/django-admin/`.
 .venv/bin/python manage.py test
 ```
 # stolda-backend
+
+## Deploy va branchlar
+
+| Branch | Push qilinsa |
+|---|---|
+| `main` | Tekshiruv → **serverga avtomatik deploy** (stolda.uz yangilanadi) |
+| `dev`  | Faqat GitHub'da saqlanadi — **deploy bo'lmaydi** |
+
+**Kundalik ish — `dev`da:**
+
+```bash
+git checkout dev
+git add -A && git commit -m "nima o'zgardi"
+git push
+```
+
+**Serverga chiqarish — `dev`ni `main`ga qo'shish:**
+
+```bash
+git checkout main && git pull
+git merge dev
+git push            # → avtomatik deploy (6–8 daqiqa)
+git checkout dev    # ishni davom ettirish uchun
+```
+
+- Natija: GitHub → repo → **Actions**. Yashil ✅ — server yangilandi, qizil ❌ — eski versiya ishlayveradi.
+- Testlar yoki build yiqilsa, deploy bo'lmaydi.
+- `main`ga push qilib, deploy qilmaslik kerak bo'lsa: commit xabariga `[skip ci]` qo'shing.
+- Ikkala repodan birini deploy qilish kifoya — server har safar ikkalasini ham yangilaydi.
+- Batafsil: `DEPLOY.md` (frontend reposida).
