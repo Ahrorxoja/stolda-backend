@@ -40,13 +40,21 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Serverga deploy
+      - name: Kalitni tayyorlash
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          install -m 600 /dev/null key && printf '%s\n' "$SSH_KEY" > key
-          ssh -i key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 root@173.212.226.178 deploy
-          rm -f key
+          test -n "$SSH_KEY" || { echo "DEPLOY_SSH_KEY secret bo'sh yoki yo'q"; exit 1; }
+          mkdir -p ~/.ssh && install -m 600 /dev/null ~/.ssh/deploy
+          # Windows/brauzerdan qo'yilganda \r qo'shilib qolishi mumkin.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy
+          ssh-keygen -lf ~/.ssh/deploy
+      - name: Serverga ulanish
+        run: ssh-keyscan -T 15 -H 173.212.226.178 >> ~/.ssh/known_hosts
+      - name: Serverga deploy
+        run: |
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 root@173.212.226.178 deploy
       - name: Sayt ishlayaptimi
         run: |
           sleep 10
