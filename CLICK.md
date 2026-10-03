@@ -10,6 +10,47 @@ usuli zaxira sifatida qoladi.
 
 ---
 
+## Ulash — qadam-baqadam (shu tartibda)
+
+Click kodi hozircha faqat `dev` branch'da. Server `main` dagi kodni ishlatadi,
+shuning uchun faqat kalit qo'yish yetmaydi — kodni ham chiqarish kerak.
+
+1. **Kalitlarni serverga yozing** — 2-bo'lim. `./deploy.sh` ni hozir
+   ishlatmasangiz ham bo'ladi, keyingi qadamdagi deploy uni o'zi bajaradi.
+
+2. **Kodni chiqaring** — o'z kompyuteringizda, avval backend:
+   ```bash
+   cd ~/Development/stolda-backend
+   git checkout main && git pull && git merge dev && git push && git checkout dev
+   ```
+   GitHub → `stolda-backend` → **Actions** — yashil ✅ chiqishini kuting
+   (6–8 daqiqa). Qizil ❌ bo'lsa sayt eski versiyada ishlayveradi, hech narsa
+   buzilmaydi. Keyin frontend:
+   ```bash
+   cd ~/Development/stolda
+   git checkout main && git pull && git merge dev && git push && git checkout dev
+   ```
+   Yana yashil ✅ ni kuting.
+
+3. **Click kabinetiga Prepare/Complete URL'larini kiriting** — 1-bo'lim.
+   Deploydan *keyin* — aks holda Click tekshirganda manzil hali yo'q bo'ladi.
+
+4. **Tekshiring** — 3-bo'lim: tugma chiqdimi, keyin o'zingizdan oylik
+   (99 000 so'm) to'lab ko'ring. Muddat uzayishi va Telegram'ga «💳 Click»
+   xabari kelishi kerak.
+
+**Muammo chiqsa — Click'ni o'chirish:** serverdagi `.env` da uchta kalitni
+bo'shating (`CLICK_SERVICE_ID=`, `CLICK_MERCHANT_ID=`, `CLICK_SECRET_KEY=`) va
+
+```bash
+cd /srv/stolda/stolda-backend/deploy && ./deploy.sh
+```
+
+Tugma yo'qoladi, sayt avvalgidek chek orqali to'lov bilan ishlaydi. Kodni
+qaytarish shart emas.
+
+---
+
 ## 1. Click kabinetida (merchant.click.uz)
 
 Xizmat (servis) sozlamalarida shu ikki manzilni kiriting:
