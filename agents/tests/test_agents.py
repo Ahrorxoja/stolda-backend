@@ -61,7 +61,7 @@ class AgentTestCase(TestCase):
     def pay(self, restaurant: Restaurant, period="month", when=None) -> Invoice:
         """Chek yuklanib, tasdiqlangandek — `on_commit` xabarlari bilan."""
         subscription = restaurant.subscription
-        amount = subscription.plan.price_year if period == "year" else subscription.plan.price_month
+        amount = subscription.plan.price_for(period)
         receipt = PaymentReceipt.objects.create(
             subscription=subscription, image=receipt_image(), amount=amount, period=period
         )

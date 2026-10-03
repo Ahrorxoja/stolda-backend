@@ -130,8 +130,13 @@ class ReceiptView(APIView):
         serializer.is_valid(raise_exception=True)
         period = serializer.validated_data["period"]
 
-        plan = subscription.plan
-        amount = plan.price_year if period == "year" else plan.price_month
+        amount = subscription.plan.price_for(period)
+        if amount <= 0:
+            # Narxi qo'yilmagan davr (masalan Pro) — 0 so'mlik chek yozilmasin.
+            return Response(
+                {"detail": "Bu davr uchun to'lov hozircha mavjud emas."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         receipt = PaymentReceipt.objects.create(
             subscription=subscription,

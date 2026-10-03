@@ -43,13 +43,15 @@ def monthly_agent_share(start, end) -> int:
 
 
 def mrr() -> int:
-    """Hozir to'layotgan restoranlar oyiga qancha beradi (yillik — 12 ga bo'lib)."""
+    """Hozir to'layotgan restoranlar oyiga qancha beradi (6 oylik — 6 ga, yillik — 12 ga bo'lib)."""
+    months = {
+        Subscription.Period.MONTH: 1,
+        Subscription.Period.HALF_YEAR: 6,
+        Subscription.Period.YEAR: 12,
+    }
     total = 0
     for subscription in Subscription.objects.filter(status=Subscription.Status.ACTIVE).select_related("plan"):
-        if subscription.period == Subscription.Period.YEAR:
-            total += subscription.plan.price_year // 12
-        else:
-            total += subscription.plan.price_month
+        total += subscription.price // months[subscription.period]
     return total
 
 

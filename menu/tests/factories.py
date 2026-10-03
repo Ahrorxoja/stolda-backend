@@ -12,6 +12,7 @@ def make_plan(code: str = "standard", **kwargs) -> Plan:
     defaults = {
         "name": "Standart" if code == "standard" else "Pro",
         "price_month": 99_000 if code == "standard" else 0,
+        "price_half_year": 549_000 if code == "standard" else 0,
         "price_year": 990_000 if code == "standard" else 0,
         "features": {"dish_limit": None, "stats": True},
         "is_public": True,

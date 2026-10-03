@@ -69,6 +69,28 @@ class ReceiptUploadTests(TestCase):
             PaymentReceipt.objects.get().amount, self.subscription.plan.price_year
         )
 
+    def test_half_year_period_uses_the_half_year_price(self):
+        response = self.upload(period="half")
+
+        self.assertEqual(response.status_code, 201, response.content)
+        receipt = PaymentReceipt.objects.get()
+        self.assertEqual(receipt.amount, 549_000)
+        self.assertEqual(receipt.get_period_display(), "6 oylik")
+
+    def test_period_without_a_price_is_refused(self):
+        """Narxi qo'yilmagan davrga 0 so'mlik chek yozilmasin."""
+        plan = self.subscription.plan
+        plan.price_half_year = 0
+        plan.save(update_fields=["price_half_year"])
+
+        response = self.upload(period="half")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(PaymentReceipt.objects.exists())
+
+    def test_unknown_period_is_refused(self):
+        self.assertEqual(self.upload(period="week").status_code, 400)
+
     def test_second_upload_is_blocked_while_one_is_pending(self):
         self.upload()
         response = self.upload()
@@ -172,6 +194,19 @@ class ReceiptReviewTests(TestCase):
         self.assertGreater(
             self.subscription.current_period_end, timezone.now() + timedelta(days=300)
         )
+
+    def test_half_year_receipt_gives_six_months(self):
+        self.receipt.period = "half"
+        self.receipt.amount = 549_000
+        self.receipt.save(update_fields=["period", "amount"])
+
+        invoice = approve_receipt(self.receipt)
+
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.period, "half")
+        self.assertEqual(self.subscription.price, 549_000)
+        self.assertEqual(invoice.amount, 549_000)
+        self.assertEqual((invoice.period_end - invoice.period_start).days, 183)
 
 
 def _failing_bot() -> FakeBot:
@@ -464,6 +499,12 @@ class BillingApiTests(TestCase):
     def setUp(self):
         self.restaurant = make_restaurant()
         self.owner = self.restaurant.owner
+
+    def test_overview_lists_the_half_year_price(self):
+        response = self.client.get(reverse("billing"), **auth_header(self.owner))
+
+        standard = next(p for p in response.json()["plans"] if p["code"] == "standard")
+        self.assertEqual(standard["price_half_year"], 549_000)
 
     @override_settings(PAYMENT_CARD_NUMBER="8600 1234", PAYMENT_CARD_HOLDER="ISM")
     def test_overview_includes_the_card_and_plans(self):

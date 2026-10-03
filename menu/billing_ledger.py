@@ -13,7 +13,11 @@ from django.utils import timezone
 from .cache import bump_menu_version
 from .models import Invoice, PaymentReceipt, Subscription
 
-PERIOD_DAYS = {Subscription.Period.MONTH: 30, Subscription.Period.YEAR: 365}
+PERIOD_DAYS = {
+    Subscription.Period.MONTH: 30,
+    Subscription.Period.HALF_YEAR: 183,
+    Subscription.Period.YEAR: 365,
+}
 
 
 @transaction.atomic

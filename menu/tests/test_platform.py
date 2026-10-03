@@ -99,6 +99,11 @@ class PlatformOverviewTests(TestCase):
         self.assertEqual(series[-1]["revenue"], 1_089_000)
         self.assertEqual(sum(row["revenue"] for row in series), 1_089_000 + 99_000)
 
+    def test_mrr_spreads_the_half_year_price_over_six_months(self):
+        Subscription.objects.filter(restaurant=self.monthly).update(period="half")
+
+        self.assertEqual(self.get().json()["money"]["mrr"], 549_000 // 6 + 990_000 // 12)
+
     def test_restaurants_and_attention(self):
         data = self.get().json()
 

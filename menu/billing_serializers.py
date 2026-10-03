@@ -10,7 +10,15 @@ from .serializers import ImageUrlMixin
 class PlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
-        fields = ("code", "name", "price_month", "price_year", "features", "is_public")
+        fields = (
+            "code",
+            "name",
+            "price_month",
+            "price_half_year",
+            "price_year",
+            "features",
+            "is_public",
+        )
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

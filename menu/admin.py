@@ -69,7 +69,7 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Plan)
 class PlanAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "price_month", "price_year", "is_public")
+    list_display = ("code", "name", "price_month", "price_half_year", "price_year", "is_public")
 
 
 @admin.register(Subscription)

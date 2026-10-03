@@ -459,6 +459,7 @@ class Plan(models.Model):
     code = models.CharField(max_length=16, unique=True)
     name = models.CharField(max_length=40)
     price_month = models.PositiveIntegerField(help_text="so'm")
+    price_half_year = models.PositiveIntegerField(default=0, help_text="so'm, 6 oy uchun")
     price_year = models.PositiveIntegerField(help_text="so'm")
     #: Masalan `{"dish_limit": None, "stats": True}` — `None` = cheksiz.
     features = models.JSONField(default=dict, blank=True)
@@ -467,6 +468,14 @@ class Plan(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def price_for(self, period: str) -> int:
+        """Tanlangan davr uchun to'lanadigan summa — narx faqat shu yerdan olinadi."""
+        return {
+            Subscription.Period.MONTH: self.price_month,
+            Subscription.Period.HALF_YEAR: self.price_half_year,
+            Subscription.Period.YEAR: self.price_year,
+        }[period]
 
 
 class Subscription(models.Model):
@@ -481,6 +490,7 @@ class Subscription(models.Model):
 
     class Period(models.TextChoices):
         MONTH = "month", "Oylik"
+        HALF_YEAR = "half", "6 oylik"
         YEAR = "year", "Yillik"
 
     restaurant = models.OneToOneField(
@@ -506,11 +516,7 @@ class Subscription(models.Model):
     @property
     def price(self) -> int:
         """Joriy davr uchun to'lanadigan summa."""
-        return (
-            self.plan.price_year
-            if self.period == Subscription.Period.YEAR
-            else self.plan.price_month
-        )
+        return self.plan.price_for(self.period)
 
 
 class PaymentReceipt(models.Model):
