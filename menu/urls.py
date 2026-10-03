@@ -21,6 +21,8 @@ from .member_views import (
     MemberDetailView,
     MemberListView,
 )
+from agents import platform_views
+
 from .telegram_views import ActivityUndoView, ActivityView, TelegramAuthView, TelegramLinkView
 from .views import PublicMenuView, PublicSitemapView, PublicViewEventView
 
@@ -47,6 +49,11 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
     path("stats/", StatsView.as_view(), name="stats"),
     path("platform/overview/", PlatformOverviewView.as_view(), name="platform-overview"),
+    path("platform/agents/", platform_views.AgentListView.as_view(), name="platform-agents"),
+    path("platform/agents/<int:pk>/", platform_views.AgentDetailView.as_view(), name="platform-agent"),
+    path("platform/agents/<int:pk>/active/", platform_views.AgentActiveView.as_view(), name="platform-agent-active"),
+    path("platform/restaurants/", platform_views.RestaurantSearchView.as_view(), name="platform-restaurants"),
+    path("platform/restaurants/<int:pk>/agent/", platform_views.RestaurantAgentView.as_view(), name="platform-restaurant-agent"),
     path("translate/preview/", TranslatePreviewView.as_view(), name="translate-preview"),
     # To'lov va tarif — chek yuklash, Telegram'da tasdiqlanadi.
     path("billing/", BillingView.as_view(), name="billing"),
