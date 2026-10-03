@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Category,
+    ClickPayment,
     Dish,
     Invoice,
     MenuView,
@@ -83,6 +84,15 @@ class SubscriptionAdmin(admin.ModelAdmin):
 class PaymentReceiptAdmin(admin.ModelAdmin):
     list_display = ("subscription", "amount", "period", "status", "created_at")
     list_filter = ("status", "period")
+    date_hierarchy = "created_at"
+
+
+@admin.register(ClickPayment)
+class ClickPaymentAdmin(admin.ModelAdmin):
+    list_display = ("pk", "subscription", "amount", "period", "status", "click_trans_id", "fiscalized_at", "created_at")
+    list_filter = ("status", "period")
+    search_fields = ("subscription__restaurant__name", "subscription__restaurant__slug", "click_trans_id")
+    readonly_fields = ("click_trans_id", "click_paydoc_id", "invoice", "fiscalized_at", "fiscal_error", "created_at", "updated_at")
     date_hierarchy = "created_at"
 
 

@@ -13,7 +13,13 @@ from .admin_views import (
     TranslatePreviewView,
 )
 from .auth import GoogleAuthView, PhoneTokenObtainView, SignupView
-from .billing_views import BillingView, ReceiptView
+from .billing_views import (
+    BillingView,
+    ClickCompleteView,
+    ClickCreateView,
+    ClickPrepareView,
+    ReceiptView,
+)
 from .member_views import (
     InviteAcceptView,
     InviteDetailView,
@@ -58,6 +64,9 @@ urlpatterns = [
     # To'lov va tarif — chek yuklash, Telegram'da tasdiqlanadi.
     path("billing/", BillingView.as_view(), name="billing"),
     path("billing/receipt/", ReceiptView.as_view(), name="billing-receipt"),
+    path("billing/click/", ClickCreateView.as_view(), name="billing-click"),
+    path("billing/click/prepare/", ClickPrepareView.as_view(), name="click-prepare"),
+    path("billing/click/complete/", ClickCompleteView.as_view(), name="click-complete"),
     # Xodimlar — restoranni bir nechta odam boshqarishi uchun.
     path("members/", MemberListView.as_view(), name="member-list"),
     path("members/<int:pk>/", MemberDetailView.as_view(), name="member-detail"),

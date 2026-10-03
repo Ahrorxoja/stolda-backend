@@ -8,9 +8,12 @@ from django.conf import settings
 from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from . import click
 
 from .billing_serializers import (
     InvoiceSerializer,
@@ -20,12 +23,14 @@ from .billing_serializers import (
     SubscriptionSerializer,
 )
 from .models import (
+    ClickPayment,
     Invoice,
     PaymentReceipt,
     PlatformSettings,
     Plan,
     Restaurant,
     RestaurantMember,
+    Subscription,
 )
 from .tasks import send_receipt_to_telegram
 
@@ -92,6 +97,7 @@ class BillingView(APIView):
                     Plan.objects.filter(is_public=True), many=True
                 ).data,
                 "payment": _payment_details(),
+                "click_enabled": click.is_enabled(),
                 "pending_receipt": (
                     PaymentReceiptSerializer(pending, context=context).data
                     if pending
@@ -150,3 +156,66 @@ class ReceiptView(APIView):
             PaymentReceiptSerializer(receipt, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+#: To'lovdan keyin Click egasini qaytaradigan sahifalar.
+CLICK_RETURN_PATHS = {"admin": "/admin/billing?click=done", "app": "/app"}
+
+
+class ClickCreateView(APIView):
+    """`POST /api/billing/click/` — Click orqali to'lash uchun havola.
+
+    Mijoz faqat davrni yuboradi (`period`), summa tarifdan olinadi.
+    `return_to`: `admin` (sukut) yoki `app` (Telegram ilova).
+    """
+
+    permission_classes = (IsAuthenticated,)
+    throttle_scope = "receipt"
+
+    def post(self, request):
+        if not click.is_enabled():
+            return Response(
+                {"detail": "Click orqali to'lov hozircha ulanmagan."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subscription = _restaurant(request).subscription
+        period = request.data.get("period")
+        if period not in Subscription.Period.values:
+            return Response({"period": "Noto'g'ri davr."}, status=status.HTTP_400_BAD_REQUEST)
+        amount = subscription.plan.price_for(period)
+        if amount <= 0:
+            return Response(
+                {"detail": "Bu davr uchun to'lov hozircha mavjud emas."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payment = ClickPayment.objects.create(subscription=subscription, amount=amount, period=period)
+        path = CLICK_RETURN_PATHS.get(request.data.get("return_to"), CLICK_RETURN_PATHS["admin"])
+        return Response(
+            {"id": payment.pk, "amount": amount, "url": click.pay_url(payment, settings.SITE_URL + path)},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class _ClickCallbackView(APIView):
+    """Click serveri chaqiradi — JWT yo'q, ishonch faqat imzoda."""
+
+    permission_classes = (AllowAny,)
+    authentication_classes = ()
+    parser_classes = (FormParser, MultiPartParser, JSONParser)
+    handler = None
+
+    def post(self, request):
+        return Response(type(self).handler(request.data))
+
+
+class ClickPrepareView(_ClickCallbackView):
+    """`POST /api/billing/click/prepare/`"""
+
+    handler = staticmethod(click.prepare)
+
+
+class ClickCompleteView(_ClickCallbackView):
+    """`POST /api/billing/click/complete/`"""
+
+    handler = staticmethod(click.complete)

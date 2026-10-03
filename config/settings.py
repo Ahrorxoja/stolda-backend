@@ -208,6 +208,21 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 PAYMENT_CARD_NUMBER = os.getenv("PAYMENT_CARD_NUMBER", "")
 PAYMENT_CARD_HOLDER = os.getenv("PAYMENT_CARD_HOLDER", "")
 
+# Click (SHOP API) — merchant.click.uz kabinetidan olinadi. SERVICE_ID,
+# MERCHANT_ID va SECRET_KEY uchalasi bo'lmasa Click o'chiq: tugma
+# ko'rinmaydi, Prepare/Complete so'rovlari rad etiladi. Batafsil: CLICK.md.
+CLICK_SERVICE_ID = os.getenv("CLICK_SERVICE_ID", "").strip()
+CLICK_MERCHANT_ID = os.getenv("CLICK_MERCHANT_ID", "").strip()
+CLICK_SECRET_KEY = os.getenv("CLICK_SECRET_KEY", "").strip()
+#: Merchant API (soliq cheki yuborish) uchun.
+CLICK_MERCHANT_USER_ID = os.getenv("CLICK_MERCHANT_USER_ID", "").strip()
+#: Soliq cheki (OFD). `CLICK_FISCAL_SPIC` bo'sh bo'lsa chek yuborilmaydi.
+CLICK_FISCAL_SPIC = os.getenv("CLICK_FISCAL_SPIC", "").strip()
+CLICK_FISCAL_PACKAGE_CODE = os.getenv("CLICK_FISCAL_PACKAGE_CODE", "").strip()
+CLICK_FISCAL_VAT_PERCENT = int(os.getenv("CLICK_FISCAL_VAT_PERCENT", "0") or 0)
+#: Sotuvchining STIR (yuridik shaxs) yoki JSHSHIR (YaTT).
+CLICK_FISCAL_TIN = os.getenv("CLICK_FISCAL_TIN", "").strip()
+
 # Cheklar shu Telegram chatiga boradi va faqat shu chatdan tasdiqlanadi.
 # Token bo'lmasa `FakeBot` ishlatiladi — dev muhitida va testlarda tashqi
 # so'rov yuborilmaydi.

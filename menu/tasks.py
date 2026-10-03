@@ -313,3 +313,62 @@ def remind_agents_telegram() -> int:
     from agents.services import remind_telegram
 
     return remind_telegram()
+
+
+# ── Click ──────────────────────────────────────────────────────────────
+
+
+@shared_task
+def notify_click_payment(payment_id: int) -> None:
+    """Click orqali to'lov tushdi — platforma egasining Telegramiga xabar.
+
+    Chekdan farqli, tasdiqlash shart emas: obuna allaqachon uzaytirilgan.
+    """
+    ClickPayment = apps.get_model("menu", "ClickPayment")
+    payment = (
+        ClickPayment.objects.filter(pk=payment_id)
+        .select_related("subscription__restaurant")
+        .first()
+    )
+    if payment is None:
+        return
+    text = (
+        f"💳 <b>Click</b>: {_label(payment.subscription)}\n"
+        f"Summa: {payment.amount:,} so'm · {payment.get_period_display()}".replace(",", " ")
+    )
+    try:
+        get_bot().send_message(text)
+    except TelegramError as error:
+        logger.warning("Click to'lovi haqida xabar yuborilmadi: %s", error)
+
+
+#: Soliq chekini yuborishga necha marta urinamiz (1, 2, 4… daqiqa oralig'ida).
+FISCAL_RETRIES = 6
+
+
+@shared_task(bind=True, max_retries=FISCAL_RETRIES)
+def submit_click_fiscal(self, payment_id: int) -> dict:
+    """To'langan Click to'lovi uchun soliq chekini (OFD) Click'ga yuboradi.
+
+    Xato to'lovni bekor qilmaydi — faqat `fiscal_error` ga yoziladi va qayta
+    urinadi. Hamma urinish o'tmasa Django admindan ko'rinib turadi.
+    """
+    from .click import FiscalError, submit_fiscal
+
+    ClickPayment = apps.get_model("menu", "ClickPayment")
+    payment = ClickPayment.objects.filter(pk=payment_id).first()
+    if payment is None or payment.fiscalized_at or payment.status != ClickPayment.Status.PAID:
+        return {"skipped": True}
+    try:
+        submit_fiscal(payment)
+    except FiscalError as error:
+        payment.fiscal_error = str(error)[:300]
+        payment.save(update_fields=["fiscal_error", "updated_at"])
+        if self.request.retries < FISCAL_RETRIES:
+            raise self.retry(countdown=60 * 2**self.request.retries) from error
+        logger.error("Click soliq cheki yuborilmadi (#%s): %s", payment.pk, error)
+        return {"error": str(error)}
+    payment.fiscalized_at = timezone.now()
+    payment.fiscal_error = ""
+    payment.save(update_fields=["fiscalized_at", "fiscal_error", "updated_at"])
+    return {"ok": True}

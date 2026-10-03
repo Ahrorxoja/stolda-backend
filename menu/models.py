@@ -594,6 +594,48 @@ class Invoice(models.Model):
         return f"{self.subscription.restaurant.slug} · {self.amount} so'm · {self.status}"
 
 
+class ClickPayment(models.Model):
+    """Click orqali to'lov urinishi (SHOP API: Prepare → Complete).
+
+    Egasi davrni tanlaydi — summa serverda tarifdan hisoblanadi va shu yerda
+    qotiriladi. Click'ga `merchant_trans_id` sifatida shu qatorning `pk` i
+    boradi. Complete muvaffaqiyatli bo'lsa `billing_ledger.record_payment`
+    obunani uzaytiradi (`Invoice.provider_payment_id = click_<click_trans_id>`).
+    """
+
+    class Status(models.TextChoices):
+        CREATED = "created", "Yaratildi"
+        PREPARED = "prepared", "Click tekshirdi"
+        PAID = "paid", "To'landi"
+        CANCELED = "canceled", "Bekor qilindi"
+
+    subscription = models.ForeignKey(
+        Subscription, on_delete=models.CASCADE, related_name="click_payments"
+    )
+    #: So'mda, butun son — tarif narxidan, mijozdan emas.
+    amount = models.PositiveIntegerField(help_text="so'm")
+    period = models.CharField(max_length=8, choices=Subscription.Period.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.CREATED)
+    click_trans_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    click_paydoc_id = models.BigIntegerField(null=True, blank=True)
+    #: Bekor qilinganda Click yuborgan xato (masalan "Insufficient funds").
+    error_note = models.CharField(max_length=200, blank=True)
+    invoice = models.OneToOneField(
+        Invoice, on_delete=models.SET_NULL, null=True, blank=True, related_name="click_payment"
+    )
+    #: Soliq cheki (OFD) Click'ga yuborilgan vaqt; xato bo'lsa — `fiscal_error`.
+    fiscalized_at = models.DateTimeField(null=True, blank=True)
+    fiscal_error = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"Click #{self.pk} · {self.subscription.restaurant.slug} · {self.amount} so'm · {self.status}"
+
+
 class Category(models.Model):
     restaurant = models.ForeignKey(
         Restaurant, on_delete=models.CASCADE, related_name="categories"
