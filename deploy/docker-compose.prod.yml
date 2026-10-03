@@ -173,6 +173,9 @@ services:
       API_URL: http://api:8000
       NEXT_PUBLIC_API_URL: ""
       MEDIA_URL: https://${DOMAIN}
+    volumes:
+      # Kichraytirilgan rasmlar keshi — deploydan keyin ham saqlanadi.
+      - next-cache:/app/.next/cache
     depends_on:
       - api
 
@@ -188,6 +191,8 @@ services:
       - certbot-www:/var/www/certbot:ro
       - media:/srv/media:ro
       - static:/srv/static:ro
+      # Menyu rasmlari keshi (`/_next/image`) — nginx.conf → proxy_cache.
+      - nginx-cache:/var/cache/nginx
     depends_on:
       - web
       - api
@@ -209,5 +214,7 @@ volumes:
   pgdata:
   media:
   static:
+  next-cache:
+  nginx-cache:
   certbot-conf:
   certbot-www:
