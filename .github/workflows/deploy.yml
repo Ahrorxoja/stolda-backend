@@ -1,0 +1,54 @@
+# main'ga push → testlar → (o'tsa) serverga deploy.
+# Server tomoni: /srv/stolda/deploy-hook.sh (kalit faqat shu skriptni ishga tushira oladi).
+name: Test va deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: stolda
+          POSTGRES_USER: stolda
+          POSTGRES_PASSWORD: stolda
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U stolda" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Testlar
+        run: python manage.py test
+        env:
+          POSTGRES_HOST: 127.0.0.1
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Serverga deploy
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 600 /dev/null key && printf '%s\n' "$SSH_KEY" > key
+          ssh -i key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 root@173.212.226.178 deploy
+          rm -f key
+      - name: Sayt ishlayaptimi
+        run: |
+          sleep 10
+          curl -fsS -o /dev/null https://stolda.uz/
+          curl -fsS -o /dev/null https://stolda.uz/demo
