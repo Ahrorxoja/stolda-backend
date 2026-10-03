@@ -44,6 +44,7 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "working_hours",
             "phone",
             "extra_phones",
+            "delivery_phones",
             "instagram",
             "facebook",
             "telegram",
@@ -181,6 +182,11 @@ class MenuViewCreateSerializer(serializers.Serializer):
         if attrs.get("kind") == ViewKind.DISH_OPEN and not attrs.get("dish"):
             raise serializers.ValidationError(
                 {"dish": "`dish_open` uchun taom ko'rsatilishi shart."}
+            )
+        # Raqami yo'q restoranga qo'ng'iroq hisoblanmasin — statistika shishmasin.
+        if attrs.get("kind") == ViewKind.DELIVERY_CALL and not self.restaurant.delivery_phones:
+            raise serializers.ValidationError(
+                {"kind": "Bu restoranda yetkazib berish raqami yo'q."}
             )
         return attrs
 

@@ -625,10 +625,12 @@ class StatsView(APIView):
                 "today": {
                     "dish_opens": today_counts["opens"],
                     "scans": today_counts["scans"],
+                    "delivery_calls": today_counts["calls"],
                 },
                 "period": {
                     "dish_opens": range_counts["opens"],
                     "scans": range_counts["scans"],
+                    "delivery_calls": range_counts["calls"],
                 },
                 "trend": {
                     "today_dish_opens": _change(
@@ -657,6 +659,7 @@ class StatsView(APIView):
         return window.aggregate(
             opens=Count("id", filter=Q(kind=ViewKind.DISH_OPEN)),
             scans=Count("id", filter=Q(kind=ViewKind.SCAN)),
+            calls=Count("id", filter=Q(kind=ViewKind.DELIVERY_CALL)),
         )
 
     def _restaurant(self, request) -> Restaurant:

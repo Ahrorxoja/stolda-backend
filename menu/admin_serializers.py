@@ -102,6 +102,11 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
         child=serializers.CharField(allow_blank=True, max_length=32),
         required=False,
     )
+    #: Yetkazib berish raqamlari — `extra_phones` kabi tozalanadi.
+    delivery_phones = serializers.ListField(
+        child=serializers.CharField(allow_blank=True, max_length=32),
+        required=False,
+    )
     translation_meta = TranslationMetaField(required=False)
     logo = WebpImageField(required=False, allow_null=True, write_only=True)
     cover = WebpImageField(required=False, allow_null=True, write_only=True)
@@ -127,6 +132,7 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "working_hours",
             "phone",
             "extra_phones",
+            "delivery_phones",
             "city",
             "region",
             "instagram",
@@ -186,6 +192,20 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
         if len(cleaned) > MAX_EXTRA_PHONES:
             raise serializers.ValidationError(
                 f"Ko'pi bilan {MAX_EXTRA_PHONES} ta qo'shimcha raqam qo'shsa bo'ladi."
+            )
+        return cleaned
+
+    def validate_delivery_phones(self, value) -> list[str]:
+        """Bo'sh qatorlar tushadi, raqamlar bir ko'rinishga keltiriladi."""
+        for item in value:
+            if (item or "").strip() and not is_valid_phone(item):
+                raise serializers.ValidationError(
+                    f"Telefon raqamini to'liq yozing: {item}"
+                )
+        cleaned = clean_phone_list(value)
+        if len(cleaned) > MAX_EXTRA_PHONES:
+            raise serializers.ValidationError(
+                f"Ko'pi bilan {MAX_EXTRA_PHONES} ta raqam qo'shsa bo'ladi."
             )
         return cleaned
 

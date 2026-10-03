@@ -42,6 +42,8 @@ class Badge(models.TextChoices):
 class ViewKind(models.TextChoices):
     SCAN = "scan", "QR skaner"
     DISH_OPEN = "dish_open", "Taom ochildi"
+    #: Mijoz menyudagi yetkazib berish raqamini bosdi (qo'ng'iroq qildi).
+    DELIVERY_CALL = "delivery_call", "Yetkazib berishga qo'ng'iroq"
 
 
 class PlatformSettings(models.Model):
@@ -164,6 +166,11 @@ class Restaurant(models.Model):
     #: Qo'shimcha raqamlar — masalan filial yoki yetkazib berish bo'limi.
     #: Asosiy raqam `phone` da qoladi: sinov muddati tekshiruvi shunga bog'liq.
     extra_phones = models.JSONField(
+        default=list, validators=[validate_phone_list], blank=True
+    )
+    #: Yetkazib berish raqamlari. Bo'sh bo'lsa menyuda "Yetkazib berish"
+    #: umuman ko'rinmaydi. Faqat ma'lumot — buyurtma tizimi yo'q.
+    delivery_phones = models.JSONField(
         default=list, validators=[validate_phone_list], blank=True
     )
     #: Bog'lanish uchun ko'rsatiladi, menyuda tarjima qilinmaydi.
