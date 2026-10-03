@@ -170,7 +170,9 @@ def process_subscriptions() -> dict:
     turadi. Celery Beat orqali chaqiriladi (`config/settings.py`).
     """
     now = timezone.now()
-    today = now.date()
+    # Kunlar Toshkent kalendari bo'yicha sanaladi ("3 kundan keyin" — egasining
+    # kuni). UTC sanasi kechqurun 19:00 dan keyin bir kun oldinda qolardi.
+    today = timezone.localdate(now)
     reminder_date = today + timedelta(days=3)
     #: Ikkinchi eslatma — muddat tugashidan bir kun oldin.
     last_day = today + timedelta(days=1)
@@ -236,13 +238,14 @@ def process_subscriptions() -> dict:
         if end_date is None:
             continue
 
-        if end_date.date() == reminder_date:
+        end_day = timezone.localdate(end_date)
+        if end_day == reminder_date:
             logger.info("Eslatma: %s uchun muddat 3 kundan keyin", subscription.restaurant.slug)
             digest.append(f"🔔 {_label(subscription)} — 3 kundan keyin tugaydi")
             trial = subscription.status == Subscription.Status.TRIALING
             tell_agent(subscription, "trial_soon" if trial else "due_soon", end_date)
             stats["reminded"] += 1
-        elif end_date.date() == last_day:
+        elif end_day == last_day:
             digest.append(f"🔔 {_label(subscription)} — ertaga tugaydi")
             trial = subscription.status == Subscription.Status.TRIALING
             tell_agent(subscription, "trial_tomorrow" if trial else "due_tomorrow", end_date)

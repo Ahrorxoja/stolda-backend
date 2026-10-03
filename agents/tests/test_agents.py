@@ -1,7 +1,7 @@
 """Agentlar: biriktirish, daromad, pul yechish va botlar."""
 
 import io
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -641,8 +641,14 @@ class ReminderTests(AgentTestCase):
             process_subscriptions()
         return self.agent_bot.texts(AGENT_CHAT_ID)
 
+    @staticmethod
+    def day_noon(days: int):
+        """N kundan keyingi kunning tushi (Toshkent) — test soatga bog'liq bo'lmasin."""
+        day = timezone.localdate() + timedelta(days=days)
+        return timezone.make_aware(datetime.combine(day, time(12)))
+
     def set_end(self, days: float, status="active"):
-        end = timezone.now() + timedelta(days=days)
+        end = self.day_noon(int(days)) if days >= 1 else timezone.now() + timedelta(days=days)
         Subscription.objects.filter(pk=self.subscription.pk).update(
             status=status,
             current_period_end=end,
@@ -677,7 +683,7 @@ class ReminderTests(AgentTestCase):
         second = make_restaurant(slug="ikkinchi", name="Ikkinchi")
         services.attach(second, self.agent)
         self.agent_bot.sent.clear()
-        end = timezone.now() + timedelta(days=3.2)
+        end = self.day_noon(3)
         Subscription.objects.update(status="active", current_period_end=end)
 
         texts = self.run_daily()
