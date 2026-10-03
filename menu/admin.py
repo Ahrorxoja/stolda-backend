@@ -154,7 +154,21 @@ class PlatformSettingsAdmin(admin.ModelAdmin):
             "fields": ("support_phone", "support_telegram"),
             "description": "To'lov sahifasida ko'rinadi — muammo chiqqanda murojaat uchun.",
         }),
+        ("Click", {
+            "fields": ("show_click_button", "click_keys_status"),
+        }),
     )
+    readonly_fields = ("click_keys_status",)
+
+    @admin.display(description="Serverdagi Click kalitlari")
+    def click_keys_status(self, obj) -> str:
+        from .click import is_enabled
+
+        return (
+            "✅ Qo'yilgan — to'lov ishlaydi."
+            if is_enabled()
+            else "❌ Qo'yilmagan — tugma ko'rinadi, lekin to'lov ishlamaydi (CLICK.md, 2-qadam)."
+        )
 
     def has_add_permission(self, request) -> bool:
         return not PlatformSettings.objects.exists()

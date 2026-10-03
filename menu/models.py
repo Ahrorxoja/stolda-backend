@@ -60,6 +60,14 @@ class PlatformSettings(models.Model):
     #: To'lovda muammo chiqqan restoran egasi shu yerga murojaat qiladi.
     support_phone = models.CharField("Yordam telefoni", max_length=32, blank=True)
     support_telegram = models.CharField("Yordam Telegrami", max_length=120, blank=True)
+    #: To'lov sahifasida Click tugmasi ko'rinadimi. Kalitlarga bog'liq emas —
+    #: kalitsiz ham dizaynni ko'rish mumkin, bosilganda "ulanmagan" deydi.
+    show_click_button = models.BooleanField(
+        "Click tugmasini ko'rsatish",
+        default=False,
+        help_text="Yoqilsa to'lov sahifasida «Click orqali to'lash» tugmasi chiqadi. "
+        "To'lov ishlashi uchun serverda CLICK_* kalitlari ham kerak (CLICK.md).",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

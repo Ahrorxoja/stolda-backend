@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from menu import click
-from menu.models import ClickPayment, Invoice, Subscription
+from menu.models import ClickPayment, Invoice, PlatformSettings, Subscription
 from menu.tasks import notify_click_payment, submit_click_fiscal
 from telegrambot import FakeBot
 
@@ -133,21 +133,33 @@ class CreateTests(ClickTestCase):
     def test_needs_login(self):
         self.assertEqual(self.client.post(reverse("billing-click"), {"period": "month"}).status_code, 401)
 
-    def test_overview_says_click_is_on(self):
-        data = self.client.get(reverse("billing"), **auth_header(self.owner)).json()
-        self.assertTrue(data["click_enabled"])
+    def test_button_follows_the_admin_switch(self):
+        url = reverse("billing")
+        self.assertFalse(self.client.get(url, **auth_header(self.owner)).json()["click_enabled"])
+
+        settings_row = PlatformSettings.load()
+        settings_row.show_click_button = True
+        settings_row.save()
+        self.assertTrue(self.client.get(url, **auth_header(self.owner)).json()["click_enabled"])
 
 
 @override_settings(CLICK_SERVICE_ID="", CLICK_MERCHANT_ID="", CLICK_SECRET_KEY="")
 class DisabledTests(ClickTestCase):
-    def test_no_keys_no_button(self):
+    def test_button_can_be_shown_but_payment_is_refused(self):
+        """Kalitsiz ham tugmani ko'rsatish mumkin (dizayn uchun), to'lov esa boshlanmaydi."""
+        settings_row = PlatformSettings.load()
+        settings_row.show_click_button = True
+        settings_row.save()
+
         data = self.client.get(reverse("billing"), **auth_header(self.owner)).json()
-        self.assertFalse(data["click_enabled"])
+        self.assertTrue(data["click_enabled"])
 
         response = self.client.post(
             reverse("billing-click"), {"period": "month"}, **auth_header(self.owner)
         )
         self.assertEqual(response.status_code, 400)
+        self.assertIn("ulanmagan", response.json()["detail"])
+        self.assertFalse(ClickPayment.objects.exclude(pk=self.payment.pk).exists())
 
     def test_callbacks_are_refused(self):
         self.assertEqual(self.prepare()["error"], click.SIGN_FAILED)

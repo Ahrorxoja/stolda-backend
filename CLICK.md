@@ -4,7 +4,7 @@ Click ulangach restoran egasi «Click orqali to'lash» tugmasini bosib to'laydi
 va obuna **o'zi uzayadi** — chekni qo'lda tasdiqlash shart emas.
 Chek orqali to'lov ham zaxira sifatida qoladi.
 
-Kod tayyor, hozir faqat `dev` da. Quyidagi 5 qadamni **shu tartibda** bajaring.
+Kod tayyor, hozir faqat `dev` da. Quyidagi 6 qadamni **shu tartibda** bajaring.
 
 ---
 
@@ -69,9 +69,17 @@ Faqat 3-qadamdan **keyin**:
 
 Oxiridagi `/` belgisini tushirib qoldirmang.
 
-## 5-qadam. Tekshiring
+## 5-qadam. Tugmani yoqing
 
-1. **stolda.uz/admin/billing** ni oching → pastda oltinrang
+stolda.uz/django-admin → **Platforma sozlamalari** → «Click» bo'limi:
+
+- **«Click tugmasini ko'rsatish»** ga belgi qo'ying → **Save**.
+- Pastdagi «Serverdagi Click kalitlari» qatorida **✅ Qo'yilgan** turishi kerak.
+  ❌ bo'lsa — 2-qadamni tekshiring.
+
+## 6-qadam. Tekshiring
+
+1. **stolda.uz/admin/billing** ni oching → «To'lov» kartasining pastida
    **«[click] orqali to'lash»** tugmasi bo'lishi kerak.
 2. O'zingizdan **oylik (99 000 so'm)** to'lab ko'ring.
 3. To'lovdan keyin:
@@ -87,12 +95,16 @@ Hammasi shunday bo'lsa — **tayyor!** 🎉
 
 | Nima bo'ldi | Nima qilish kerak |
 |---|---|
-| Tugma chiqmayapti | 2-qadamdagi 3 ta kalit to'g'ri yozilganini tekshiring, keyin pastdagi `./deploy.sh` ni ishga tushiring |
+| Tugma chiqmayapti | Django admin → Platforma sozlamalari → «Click tugmasini ko'rsatish» yoqilganmi? |
+| Tugma bor, bosilsa «ulanmagan» deydi | Serverda kalitlar yo'q: 2-qadamni tekshiring, keyin pastdagi `./deploy.sh` |
 | Click sahifasida xato | Kalitlarni kabinetdagi bilan solishtiring (ortiqcha bo'sh joy bo'lmasin). 4-qadamdagi manzillarni tekshiring |
 | To'ladim, muddat uzaymadi | Django admin → **Click payments** → holati qanday? «To'landi» bo'lmasa — Click qo'llab-quvvatlashiga yozing |
 
-**Click'ni butunlay o'chirish** (tezda eski holatga qaytish):
-serverdagi `.env` da 3 ta kalitni bo'shating:
+**Click'ni tezda yashirish:** Django admin → Platforma sozlamalari →
+«Click tugmasini ko'rsatish» belgisini olib tashlang → Save. Tugma darhol
+yo'qoladi, server va kalitlarga tegish shart emas.
+
+**Click'ni butunlay o'chirish:** serverdagi `.env` da 3 ta kalitni bo'shating:
 
 ```
 CLICK_SERVICE_ID=

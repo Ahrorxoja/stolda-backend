@@ -97,7 +97,8 @@ class BillingView(APIView):
                     Plan.objects.filter(is_public=True), many=True
                 ).data,
                 "payment": _payment_details(),
-                "click_enabled": click.is_enabled(),
+                # Tugma ko'rinishi — Django admindagi belgi; to'lov esa kalitlarga bog'liq.
+                "click_enabled": PlatformSettings.load().show_click_button,
                 "pending_receipt": (
                     PaymentReceiptSerializer(pending, context=context).data
                     if pending
