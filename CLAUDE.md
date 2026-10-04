@@ -23,6 +23,12 @@ Daromad yoki sotuv statistikasi yo'q — faqat **ko'rishlar** statistikasi (qays
 - Fon vazifalari: Celery + Redis (AI tarjima). Broker berilmasa vazifalar
   darhol, shu jarayonda bajariladi — dev'da Redis shart emas.
 - AI tarjima: **Gemini API**, kalit `.env` da `GEMINI_API_KEY`.
+- AI (`ai/`): umumiy `GeminiClient` — qo'shimcha kalitlar `GEMINI_API_KEYS` (vergul bilan), zaxira model
+  `GEMINI_FALLBACK_MODEL`; 429/403 da keyingi kalit (1 daqiqa dam), hammasi tugasa keyingi model.
+  Limit Google *loyihasi* bo'yicha — kalitlar boshqa-boshqa loyihalardan bo'lsin. Tarjima ham shu mijozdan.
+- AI yordamchi (`menu/ai_views.py`, throttle `ai` 120/soat, hech narsa saqlamaydi, asosiy tilda):
+  `POST /api/ai/kcal/` → `{kcal, low, high}`, `/api/ai/ingredients/` → `{items}` (imlo, ajratish, takror),
+  `/api/ai/description/` → `{variants: [1–3]}` (faktlarni o'ylab topmaydi, og'irlik/narx yozmaydi).
 
 ## Papka tuzilmasi
 
@@ -50,7 +56,9 @@ deploy/           docker-compose, nginx, deploy va zaxira skriptlari
 - `Category`: restaurant, name{…}, subtitle{…}, icon (lucide nomi), photo(null), position, is_visible,
   visible_from(time, null), visible_to(time, null), translation_meta.
 - `Dish`: category, name{…}, description{…}, ingredients{lang:[]}, price(int, so'm),
-  weight(int), unit(g/ml), kcal(int), badges([popular, veg]), is_available, position, translation_meta.
+  weight(int), unit(g/ml), kcal(int), kcal_source(manual/ai), badges([popular, veg]), is_available, position, translation_meta.
+- `kcal_source=ai` — kaloriya `POST /api/ai/kcal/` taxmini, egasi o'zgartirmagan;
+  public API'da `kcal_estimated: true`, menyuda "≈" bilan. `kcal` `kcal_source` siz o'zgarsa — `manual`.
 - `DishPhoto`: dish, image, position (birinchisi — asosiy rasm).
 - `{…}` — restoran tanlagan tillar bo'yicha JSON (`{"uz": "...", "ru": "..."}`).
 - `Table`: restaurant, number, qr_token(unique) — QR `stolda.uz/{slug}?t={qr_token}`.

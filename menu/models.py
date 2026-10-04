@@ -34,6 +34,13 @@ class Unit(models.TextChoices):
     MILLILITER = "ml", "ml"
 
 
+class KcalSource(models.TextChoices):
+    """Kaloriyani kim kiritgan: egasi o'zi yoki AI taxmini (mijozga "≈" bilan)."""
+
+    MANUAL = "manual", "Qo'lda"
+    AI = "ai", "AI taxmini"
+
+
 class Badge(models.TextChoices):
     POPULAR = "popular", "Mashhur"
     VEG = "veg", "Vegetarian"
@@ -716,6 +723,9 @@ class Dish(models.Model):
     weight = models.PositiveIntegerField(null=True, blank=True)
     unit = models.CharField(max_length=4, choices=Unit.choices, default=Unit.GRAM)
     kcal = models.PositiveIntegerField(null=True, blank=True)
+    kcal_source = models.CharField(
+        max_length=8, choices=KcalSource.choices, default=KcalSource.MANUAL
+    )
     badges = models.JSONField(default=list, blank=True)
     is_available = models.BooleanField(default=True)
     position = models.PositiveIntegerField(default=0)

@@ -13,6 +13,7 @@ class StoldaTestRunner(DiscoverRunner):
     def setup_test_environment(self, **kwargs):
         super().setup_test_environment(**kwargs)
         settings.GEMINI_API_KEY = ""
+        settings.GEMINI_API_KEYS = ""
         settings.TELEGRAM_BOT_TOKEN = ""
         settings.TELEGRAM_ADMIN_CHAT_ID = ""
         settings.AGENT_BOT_TOKEN = ""

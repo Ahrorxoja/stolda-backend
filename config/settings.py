@@ -137,6 +137,8 @@ REST_FRAMEWORK = {
         "agent_app_write": "60/hour",
         # Restoranlar Mini App'i har ochilganda kiradi; bir Wi-Fi'da bir nechta xodim bo'ladi.
         "telegram_auth": "300/hour",
+        # Admin formasidagi AI tugmalari (kaloriya, tarkib, tavsif) — har bosish Gemini so'rovi.
+        "ai": "120/hour",
     },
 }
 
@@ -198,6 +200,11 @@ TEST_RUNNER = "config.test_runner.StoldaTestRunner"
 # AI tarjima provayderi (Gemini). Kalit bo'lmasa FakeTranslator ishlatiladi.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+# Qo'shimcha kalitlar (vergul bilan) — biri limitga uchrasa keyingisi ishlatiladi.
+# Limit Google *loyihasi* bo'yicha: kalitlar boshqa-boshqa loyihalardan bo'lsin.
+GEMINI_API_KEYS = os.getenv("GEMINI_API_KEYS", "")
+# Asosiy modelda hamma kalitlar limitga uchrasa — shu model sinaladi.
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "")
 
 # Google bilan kirish (parolsiz). Google Cloud Console'da yaratilgan
 # "OAuth 2.0 Client ID" (Web application) — frontend shu bilan ID token oladi,

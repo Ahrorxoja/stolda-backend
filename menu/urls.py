@@ -12,6 +12,7 @@ from .admin_views import (
     StatsView,
     TranslatePreviewView,
 )
+from .ai_views import DescriptionAiView, IngredientsAiView, KcalAiView
 from .auth import GoogleAuthView, PhoneTokenObtainView, SignupView
 from .billing_views import (
     BillingView,
@@ -61,6 +62,10 @@ urlpatterns = [
     path("platform/restaurants/", platform_views.RestaurantSearchView.as_view(), name="platform-restaurants"),
     path("platform/restaurants/<int:pk>/agent/", platform_views.RestaurantAgentView.as_view(), name="platform-restaurant-agent"),
     path("translate/preview/", TranslatePreviewView.as_view(), name="translate-preview"),
+    # AI yordamchi — admin formasidagi "✨ AI" tugmalari, hech narsa saqlamaydi.
+    path("ai/kcal/", KcalAiView.as_view(), name="ai-kcal"),
+    path("ai/ingredients/", IngredientsAiView.as_view(), name="ai-ingredients"),
+    path("ai/description/", DescriptionAiView.as_view(), name="ai-description"),
     # To'lov va tarif — chek yuklash, Telegram'da tasdiqlanadi.
     path("billing/", BillingView.as_view(), name="billing"),
     path("billing/receipt/", ReceiptView.as_view(), name="billing-receipt"),

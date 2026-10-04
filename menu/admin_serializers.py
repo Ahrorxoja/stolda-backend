@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from . import qr as qr_codes
 from .images import to_webp
-from .models import Badge, Category, Dish, DishPhoto, Profile, Restaurant
+from .models import Badge, Category, Dish, DishPhoto, KcalSource, Profile, Restaurant
 from .permissions import is_member
 from .phones import (
     MAX_EXTRA_PHONES,
@@ -352,6 +352,7 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
             "weight",
             "unit",
             "kcal",
+            "kcal_source",
             "photos",
             "photo",
             "photo_original",
@@ -440,6 +441,14 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
                         "Ko'proq taom uchun tarifni yangilang."
                     }
                 )
+        # Kaloriya `kcal_source` siz o'zgartirilsa (Telegram, eski klient) —
+        # endi uni odam kiritgan, AI taxmini belgisi qolmasin.
+        if "kcal" in attrs and "kcal_source" not in attrs:
+            current = self.instance.kcal if self.instance else None
+            if attrs["kcal"] != current:
+                attrs["kcal_source"] = KcalSource.MANUAL
+        if attrs.get("kcal", 0) is None:
+            attrs["kcal_source"] = KcalSource.MANUAL
         return attrs
 
 
@@ -467,6 +476,29 @@ class TranslatePreviewSerializer(serializers.Serializer):
             elif not isinstance(text, str):
                 raise serializers.ValidationError(f"`{key}` matn yoki ro'yxat bo'lishi kerak.")
         return value
+
+
+class DishAiSerializer(serializers.Serializer):
+    """`POST /api/ai/kcal/` va `/api/ai/description/` — formadagi (saqlanmagan) taom."""
+
+    restaurant = serializers.IntegerField()
+    category = serializers.IntegerField(required=False, allow_null=True)
+    name = serializers.CharField(max_length=200)
+    description = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    ingredients = serializers.ListField(
+        child=serializers.CharField(max_length=120), required=False, max_length=60
+    )
+    weight = serializers.IntegerField(min_value=1, max_value=10000, required=False, allow_null=True)
+    unit = serializers.ChoiceField(choices=("g", "ml"), default="g")
+
+
+class IngredientsAiSerializer(serializers.Serializer):
+    """`POST /api/ai/ingredients/` — tarkib chiplari, asosiy tilda."""
+
+    restaurant = serializers.IntegerField()
+    items = serializers.ListField(
+        child=serializers.CharField(max_length=300), allow_empty=False, max_length=60
+    )
 
 
 class PositionSerializer(serializers.Serializer):

@@ -7,7 +7,7 @@ almashtiradi, qayta so'rov yubormaydi.
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import Category, Dish, MenuView, Restaurant, ViewKind
+from .models import Category, Dish, KcalSource, MenuView, Restaurant, ViewKind
 
 
 def absolute_media_url(image, request=None) -> str | None:
@@ -114,6 +114,8 @@ class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
     photo_original = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
     category = serializers.IntegerField(source="category_id")
+    #: Kaloriya AI taxmini va egasi tegmagan — menyuda "≈" bilan ko'rinadi.
+    kcal_estimated = serializers.SerializerMethodField()
 
     class Meta:
         model = Dish
@@ -127,12 +129,16 @@ class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "weight",
             "unit",
             "kcal",
+            "kcal_estimated",
             "photo",
             "photo_original",
             "photos",
             "badges",
             "position",
         )
+
+    def get_kcal_estimated(self, obj: Dish) -> bool:
+        return obj.kcal is not None and obj.kcal_source == KcalSource.AI
 
     def get_photo(self, obj: Dish) -> str | None:
         photos = self._photo_list(obj)
