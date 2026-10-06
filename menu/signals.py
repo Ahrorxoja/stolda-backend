@@ -58,14 +58,23 @@ def ensure_owner_membership(sender, instance, **kwargs) -> None:
 
     Restoran API orqali ham, seed yoki testda ham yaratilishi mumkin —
     a'zolik shu yerda berilsa ikkalasi bir joyda turadi.
+    Egasi o'zgarganda eski egadan `owner` a'zoligi o'chiriladi.
     """
     if instance.owner_id is None:
         return
-    RestaurantMember.objects.get_or_create(
+    member, created = RestaurantMember.objects.get_or_create(
         restaurant=instance,
         user_id=instance.owner_id,
         defaults={"role": RestaurantMember.Role.OWNER},
     )
+    if not created and member.role != RestaurantMember.Role.OWNER:
+        member.role = RestaurantMember.Role.OWNER
+        member.save(update_fields=["role"])
+
+    RestaurantMember.objects.filter(
+        restaurant=instance,
+        role=RestaurantMember.Role.OWNER,
+    ).exclude(user_id=instance.owner_id).delete()
 
 
 @receiver(post_save, sender=get_user_model())

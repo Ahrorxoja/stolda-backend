@@ -11,6 +11,7 @@ from .models import (
     PlatformSettings,
     Profile,
     Restaurant,
+    RestaurantMember,
     Subscription,
 )
 from .translations import translate
@@ -58,6 +59,21 @@ class RestaurantAdmin(admin.ModelAdmin):
     def owner_telegram(self, obj: Restaurant) -> str:
         profile = getattr(obj.owner, "profile", None)
         return (profile.telegram if profile else "") or "—"
+
+
+@admin.register(RestaurantMember)
+class RestaurantMemberAdmin(admin.ModelAdmin):
+    list_display = ("restaurant", "user", "role", "created_at")
+    list_filter = ("role", "restaurant")
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "restaurant__name",
+        "restaurant__slug",
+    )
+    raw_id_fields = ("restaurant", "user")
 
 
 @admin.register(Profile)
