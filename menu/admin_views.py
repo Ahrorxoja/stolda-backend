@@ -180,7 +180,8 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         if set(serializer.validated_data) <= self.QR_FIELDS:
             require(serializer.instance, self.request.user, "qr")
         else:
-            require_owner(serializer.instance, self.request.user, "Restoran sozlamalarini faqat egasi o'zgartira oladi.")
+            if not is_member(serializer.instance, self.request.user):
+                raise PermissionDenied("Restoran sozlamalarini o'zgartirishga ruxsatingiz yo'q.")
         before = set(serializer.instance.languages or [])
         # Ro'yxatdan o'tishda orqaga qaytib kodni keyin yozgan bo'lsa ham —
         # faqat hali agent yo'q va sinovda bo'lsa (to'lagandan keyin — admin orqali).

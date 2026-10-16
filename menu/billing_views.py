@@ -90,12 +90,34 @@ class BillingView(APIView):
             "receipt"
         )[:12]
 
+        subscription_data = SubscriptionSerializer(subscription).data
+        plans_data = PlanSerializer(
+            Plan.objects.filter(is_public=True), many=True
+        ).data
+
+        if restaurant.custom_price_enabled:
+            for plan_dict in plans_data:
+                if restaurant.custom_price_month is not None:
+                    plan_dict["price_month"] = restaurant.custom_price_month
+                if restaurant.custom_price_half_year is not None:
+                    plan_dict["price_half_year"] = restaurant.custom_price_half_year
+                if restaurant.custom_price_year is not None:
+                    plan_dict["price_year"] = restaurant.custom_price_year
+                plan_dict["is_custom"] = True
+
+            if subscription_data.get("plan"):
+                if restaurant.custom_price_month is not None:
+                    subscription_data["plan"]["price_month"] = restaurant.custom_price_month
+                if restaurant.custom_price_half_year is not None:
+                    subscription_data["plan"]["price_half_year"] = restaurant.custom_price_half_year
+                if restaurant.custom_price_year is not None:
+                    subscription_data["plan"]["price_year"] = restaurant.custom_price_year
+                subscription_data["plan"]["is_custom"] = True
+
         return Response(
             {
-                "subscription": SubscriptionSerializer(subscription).data,
-                "plans": PlanSerializer(
-                    Plan.objects.filter(is_public=True), many=True
-                ).data,
+                "subscription": subscription_data,
+                "plans": plans_data,
                 "payment": _payment_details(),
                 # Tugma ko'rinishi — Django admindagi belgi; to'lov esa kalitlarga bog'liq.
                 "click_enabled": PlatformSettings.load().show_click_button,
@@ -137,7 +159,7 @@ class ReceiptView(APIView):
         serializer.is_valid(raise_exception=True)
         period = serializer.validated_data["period"]
 
-        amount = subscription.plan.price_for(period)
+        amount = subscription.price_for(period)
         if amount <= 0:
             # Narxi qo'yilmagan davr (masalan Pro) — 0 so'mlik chek yozilmasin.
             return Response(
@@ -183,7 +205,7 @@ class ClickCreateView(APIView):
         period = request.data.get("period")
         if period not in Subscription.Period.values:
             return Response({"period": "Noto'g'ri davr."}, status=status.HTTP_400_BAD_REQUEST)
-        amount = subscription.plan.price_for(period)
+        amount = subscription.price_for(period)
         if amount <= 0:
             return Response(
                 {"detail": "Bu davr uchun to'lov hozircha mavjud emas."},

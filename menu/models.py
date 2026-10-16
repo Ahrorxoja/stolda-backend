@@ -233,6 +233,11 @@ class Restaurant(models.Model):
         verbose_name="Agent",
     )
     agent_attached_at = models.DateTimeField(null=True, blank=True, editable=False)
+    #: Platforma egasi Django adminda belgilaydigan maxsus/individual narxlar.
+    custom_price_enabled = models.BooleanField("Maxsus narx yoqilgan", default=False)
+    custom_price_month = models.PositiveIntegerField("Maxsus oylik narx (so'm)", null=True, blank=True)
+    custom_price_half_year = models.PositiveIntegerField("Maxsus 6 oylik narx (so'm)", null=True, blank=True)
+    custom_price_year = models.PositiveIntegerField("Maxsus yillik narx (so'm)", null=True, blank=True)
     translation_meta = models.JSONField(
         default=dict, validators=[validate_translation_meta], blank=True
     )
@@ -535,10 +540,22 @@ class Subscription(models.Model):
         """Faqat `suspended` holatida mijoz menyusi to'xtaydi."""
         return self.status != Subscription.Status.SUSPENDED
 
+    def price_for(self, period: str) -> int:
+        """Tanlangan davr uchun to'lanadigan summa. Maxsus narx bo'lsa shundan olinadi."""
+        if self.restaurant.custom_price_enabled:
+            custom = {
+                Subscription.Period.MONTH: self.restaurant.custom_price_month,
+                Subscription.Period.HALF_YEAR: self.restaurant.custom_price_half_year,
+                Subscription.Period.YEAR: self.restaurant.custom_price_year,
+            }.get(period)
+            if custom is not None and custom > 0:
+                return custom
+        return self.plan.price_for(period)
+
     @property
     def price(self) -> int:
         """Joriy davr uchun to'lanadigan summa."""
-        return self.plan.price_for(self.period)
+        return self.price_for(self.period)
 
 
 class PaymentReceipt(models.Model):

@@ -23,13 +23,14 @@ class RestaurantAdmin(admin.ModelAdmin):
         "name",
         "slug",
         "subscription_status",
+        "custom_price_enabled",
         "owner_contact",
         "owner_telegram",
         "agent",
         "is_active",
         "dish_count",
     )
-    list_filter = ("is_active", "region", "agent")
+    list_filter = ("is_active", "custom_price_enabled", "region", "agent")
     search_fields = (
         "name",
         "slug",
@@ -39,6 +40,62 @@ class RestaurantAdmin(admin.ModelAdmin):
         "owner__profile__telegram",
     )
     prepopulated_fields = {"slug": ("name",)}
+
+    fieldsets = (
+        (None, {"fields": ("owner", "name", "slug", "is_active", "is_listed", "agent")}),
+        (
+            "Maxsus Narxlar (Custom Pricing)",
+            {
+                "fields": (
+                    "custom_price_enabled",
+                    "custom_price_month",
+                    "custom_price_half_year",
+                    "custom_price_year",
+                ),
+            },
+        ),
+        (
+            "Restoran Ma'lumotlari",
+            {
+                "fields": (
+                    "languages",
+                    "primary_language",
+                    "auto_translate",
+                    "cuisine",
+                    "address",
+                    "working_hours",
+                    "phone",
+                    "extra_phones",
+                    "delivery_phones",
+                    "city",
+                    "region",
+                    "instagram",
+                    "facebook",
+                    "telegram",
+                    "logo",
+                    "cover",
+                    "service_charge_percent",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "QR Sozlamalari",
+            {
+                "fields": (
+                    "qr_color",
+                    "qr_center",
+                    "qr_style",
+                    "qr_eyes",
+                    "qr_frame",
+                    "qr_title",
+                    "qr_text",
+                    "qr_show_link",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("owner__profile", "subscription")
