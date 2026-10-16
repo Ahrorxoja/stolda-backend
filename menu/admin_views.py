@@ -47,7 +47,8 @@ from .deletion import delete_restaurant, deletion_summary
 from . import activity
 from .permissions import (
     IsRestaurantMember,
-    is_owner,
+    is_member,
+    is_owner, is_member,
     member_restaurant_ids,
     permissions_of,
     require,
