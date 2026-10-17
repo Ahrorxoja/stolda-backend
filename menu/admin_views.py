@@ -48,7 +48,7 @@ from . import activity
 from .permissions import (
     IsRestaurantMember,
     is_member,
-    is_owner, is_member,
+    is_owner,
     member_restaurant_ids,
     permissions_of,
     require,
