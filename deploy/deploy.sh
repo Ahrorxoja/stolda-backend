@@ -40,8 +40,10 @@ docker compose -f docker-compose.prod.yml run --rm api python manage.py migrate 
 echo "▸ static fayllar"
 docker compose -f docker-compose.prod.yml run --rm api python manage.py collectstatic --noinput
 
-echo "▸ hamma servis ishga tushirilmoqda"
-docker compose -f docker-compose.prod.yml up -d
+echo "▸ hamma servislar uzilishsiz yangilanmoqda (Zero-Downtime)"
+docker compose -f docker-compose.prod.yml up -d --no-deps api
+docker compose -f docker-compose.prod.yml up -d --no-deps web
+docker compose -f docker-compose.prod.yml up -d worker beat bot agent_bot nginx
 
 echo "▸ nginx qayta yuklanmoqda"
 docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload 2>/dev/null || true
