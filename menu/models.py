@@ -42,8 +42,12 @@ class KcalSource(models.TextChoices):
 
 
 class Badge(models.TextChoices):
-    POPULAR = "popular", "Mashhur"
-    VEG = "veg", "Vegetarian"
+    POPULAR = "popular", "🔥 Xit"
+    CHEF = "chef", "⭐ Oshpaz tavsiyasi"
+    NEW = "new", "🆕 Yangi"
+    SPICY = "spicy", "🌶 Achiq"
+    VEG = "veg", "🌿 Parhez"
+    PROMO = "promo", "🏷 Aksiya"
 
 
 class ViewKind(models.TextChoices):
@@ -737,6 +741,8 @@ class Dish(models.Model):
     )
     #: Narx — butun son, so'mda.
     price = models.PositiveIntegerField()
+    #: Eski narx (Aksiya / Chegirma bo'lganda).
+    old_price = models.PositiveIntegerField(null=True, blank=True)
     weight = models.PositiveIntegerField(null=True, blank=True)
     unit = models.CharField(max_length=4, choices=Unit.choices, default=Unit.GRAM)
     kcal = models.PositiveIntegerField(null=True, blank=True)
@@ -768,6 +774,8 @@ class Dish(models.Model):
 
         if not isinstance(self.badges, list):
             raise ValidationError({"badges": "Belgilar ro'yxat bo'lishi kerak."})
+        if len(self.badges) > 2:
+            raise ValidationError({"badges": "Maksimal 2 ta belgi tanlash mumkin."})
         unknown = set(self.badges) - set(Badge.values)
         if unknown:
             raise ValidationError(

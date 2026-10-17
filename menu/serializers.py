@@ -126,6 +126,7 @@ class DishSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "description",
             "ingredients",
             "price",
+            "old_price",
             "weight",
             "unit",
             "kcal",

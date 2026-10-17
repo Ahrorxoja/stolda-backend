@@ -349,6 +349,7 @@ class DishAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSeria
             "description",
             "ingredients",
             "price",
+            "old_price",
             "weight",
             "unit",
             "kcal",
