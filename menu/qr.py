@@ -266,3 +266,18 @@ def restaurant_qr(
     # Klassik qora-oq QR — kutubxona xatosi bo'lmasa bu yerga yetib kelinmaydi.
     image = render(url, DEFAULT_COLOR, None, box_size)
     return RenderedQr(image, "none", DEFAULT_STYLE, DEFAULT_EYES)
+
+
+def render_svg(url: str, color: str = DEFAULT_COLOR) -> str:
+    """QR kodning vektor SVG matnini yaratadi."""
+    import io
+    import qrcode.image.svg
+
+    qr = qrcode.QRCode(box_size=10, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(url)
+    qr.make(fit=True)
+    factory = qrcode.image.svg.SvgPathImage
+    img = qr.make_image(image_factory=factory, fill_color=color, back_color="#FFFFFF")
+    stream = io.BytesIO()
+    img.save(stream)
+    return stream.getvalue().decode("utf-8")

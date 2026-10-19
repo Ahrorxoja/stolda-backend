@@ -24,14 +24,17 @@ PRINT_DPI = 300
 
 #: Shablon → (nomi, eni mm, bo'yi mm).
 TEMPLATES = {
-    "tent": ("Stol tenti", 210, 297),
+    "tent": ("Stol tenti A4", 210, 297),
+    "tent_a5": ("Stol tenti A5", 148, 210),
     "card": ("Kartochka A6", 105, 148),
+    "card_a5": ("Kartochka A5", 148, 210),
     "sticker": ("Stiker 8×8", 80, 80),
+    "sticker_round": ("Doira stiker Ø10", 100, 100),
     "poster": ("Poster A4", 210, 297),
     #: Ramkasiz, yozuvsiz — o'z dizayni, menyu kitobchasi yoki bosmaxona uchun.
     "qr": ("Faqat QR", 100, 100),
 }
-FRAMES = ("light", "dark")
+FRAMES = ("light", "dark", "gold")
 
 #: Standart yozuvlar. Shrift faqat lotin va kirillni qamraydi — boshqa
 #: tillar (xitoy, koreys, arab) uchun inglizcha ishlatiladi.
@@ -74,26 +77,40 @@ class Design:
 
     @property
     def dark(self) -> bool:
-        return self.frame == "dark"
+        return self.frame in ("dark", "gold")
+
+    @property
+    def gold(self) -> bool:
+        return self.frame == "gold"
 
     @property
     def background(self):
+        if self.gold:
+            return (26, 22, 19)
         return self.accent if self.dark else CREAM
 
     @property
     def text(self):
+        if self.gold:
+            return (245, 235, 220)
         return WHITE if self.dark else INK
 
     @property
     def title_color(self):
+        if self.gold:
+            return (212, 175, 55)
         return WHITE if self.dark else self.accent
 
     @property
     def muted(self):
+        if self.gold:
+            return (200, 175, 140)
         return (255, 255, 255, 190) if self.dark else MUTED
 
     @property
     def border(self):
+        if self.gold:
+            return (212, 175, 55, 220)
         return (255, 255, 255, 90) if self.dark else (*self.accent, 110)
 
 
@@ -297,36 +314,55 @@ def _portrait(canvas: Canvas, design: Design, qr_image: Image.Image, width: floa
         canvas.text(cx, height - 12 * s, design.link, canvas.fit(design.link, "Rubik", 3.2 * s, 500, inner_w), design.muted)
 
 
-def _sticker(canvas: Canvas, design: Design, qr_image: Image.Image, width: float, height: float):
-    """Kvadrat stiker — faqat eng kerakli: sarlavha, QR, izoh."""
-    s = width / 80
+def _sticker(canvas: Canvas, design: Design, qr_image: Image.Image, width: float, height: float, circle: bool = False):
+    """Kvadrat yoki doira stiker — faqat eng kerakli: sarlavha, QR, izoh."""
+    s = width / (100 if circle else 80)
     cx = width / 2
-    canvas.rounded((2.5 * s, 2.5 * s, width - 2.5 * s, height - 2.5 * s), 5 * s, outline=design.border, width_mm=0.45 * s)
-    title_font = canvas.fit(design.title, "PlayfairDisplay", 8.5 * s, 500, width - 16 * s, tracking=0.12)
-    canvas.text(cx, 5.5 * s, design.title, title_font, design.title_color, tracking=0.12)
-    side = 49 * s
-    _qr_card(canvas, qr_image, cx - side / 2, 18.5 * s, side)
-    _hint_row(canvas, design, cx, 70.5 * s, 3.6 * s, width - 12 * s)
+    if circle:
+        radius_mm = width / 2 - 3 * s
+        canvas.rounded((3 * s, 3 * s, width - 3 * s, height - 3 * s), radius_mm, outline=design.border, width_mm=0.6 * s)
+    else:
+        canvas.rounded((2.5 * s, 2.5 * s, width - 2.5 * s, height - 2.5 * s), 5 * s, outline=design.border, width_mm=0.45 * s)
+
+    title_font = canvas.fit(design.title, "PlayfairDisplay", 8.5 * s, 500, width - 20 * s, tracking=0.12)
+    canvas.text(cx, (7.5 if circle else 5.5) * s, design.title, title_font, design.title_color, tracking=0.12)
+    side = (52 if circle else 49) * s
+    _qr_card(canvas, qr_image, cx - side / 2, (21 if circle else 18.5) * s, side)
+    _hint_row(canvas, design, cx, (78 if circle else 70.5) * s, 3.6 * s, width - 16 * s)
 
 
 def _tent_face(canvas: Canvas, design: Design, qr_image: Image.Image, width: float, height: float):
     """Tentning bir yuzi (landshaft): chapda QR, o'ngda yozuvlar."""
-    canvas.rounded((6, 6, width - 6, height - 6), 6, outline=design.border, width_mm=0.6)
-    side = 88
-    top = (height - side) / 2
-    _qr_card(canvas, qr_image, 16, top, side)
+    s = min(width / 210.0, height / 148.5)
+    margin = 6.0 * s
+    canvas.rounded((margin, margin, width - margin, height - margin), 6.0 * s, outline=design.border, width_mm=0.6 * s)
 
-    column_left = 16 + side + 8
-    column_w = width - column_left - 12
-    cx = column_left + column_w / 2
-    _header(canvas, design, cx, top + 3, 5.4, column_w)
-    title_font = canvas.fit(design.title, "PlayfairDisplay", 19, 500, column_w, tracking=0.1)
-    canvas.text(cx, top + 15, design.title, title_font, design.title_color, tracking=0.1)
-    bottom = _hint_row(canvas, design, cx, top + 47, 6, column_w)
+    qr_left = 16.0 * s
+    side = 88.0 * s
+    top = (height - side) / 2.0
+    _qr_card(canvas, qr_image, qr_left, top, side)
+
+    column_left = qr_left + side + 8.0 * s
+    column_w = width - column_left - 12.0 * s
+    cx = column_left + column_w / 2.0
+
+    header_size = 5.4 * s
+    _header(canvas, design, cx, top + 3.0 * s, header_size, column_w)
+
+    title_size = 19.0 * s
+    title_font = canvas.fit(design.title, "PlayfairDisplay", title_size, 500, column_w, tracking=0.1)
+    canvas.text(cx, top + 15.0 * s, design.title, title_font, design.title_color, tracking=0.1)
+
+    hint_size = 6.0 * s
+    bottom = _hint_row(canvas, design, cx, top + 47.0 * s, hint_size, column_w)
+
     if design.others:
-        canvas.text(cx, bottom + 2.4, design.others, canvas.fit(design.others, "Rubik", 3.9, 400, column_w), design.muted)
+        others_size = 3.9 * s
+        canvas.text(cx, bottom + 2.4 * s, design.others, canvas.fit(design.others, "Rubik", others_size, 400, column_w), design.muted)
+
     if design.link:
-        canvas.text(cx, top + side - 6, design.link, canvas.fit(design.link, "Rubik", 3.8, 500, column_w), design.muted)
+        link_size = 3.8 * s
+        canvas.text(cx, top + side - 6.0 * s, design.link, canvas.fit(design.link, "Rubik", link_size, 500, column_w), design.muted)
 
 
 def render_template(restaurant, template: str, *, dpi: int = PRINT_DPI, qr_options=None, design_options=None) -> Image.Image:
@@ -348,7 +384,7 @@ def render_template(restaurant, template: str, *, dpi: int = PRINT_DPI, qr_optio
         side = Canvas(width, height, dpi, (255, 255, 255)).px(width)
         return rendered.image.resize((side, side), Image.Resampling.LANCZOS).convert("RGB")
 
-    if template == "tent":
+    if template in ("tent", "tent_a5"):
         face_h = height / 2
         face = Canvas(width, face_h, dpi, design.background)
         _tent_face(face, design, rendered.image, width, face_h)
@@ -361,7 +397,9 @@ def render_template(restaurant, template: str, *, dpi: int = PRINT_DPI, qr_optio
 
     canvas = Canvas(width, height, dpi, design.background)
     if template == "sticker":
-        _sticker(canvas, design, rendered.image, width, height)
+        _sticker(canvas, design, rendered.image, width, height, circle=False)
+    elif template == "sticker_round":
+        _sticker(canvas, design, rendered.image, width, height, circle=True)
     else:
         _portrait(canvas, design, rendered.image, width, height)
     return canvas.image.convert("RGB")

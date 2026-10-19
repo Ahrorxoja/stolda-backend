@@ -233,14 +233,20 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         template = params.get("template") or None
         if fmt in ("a6", "a4"):
             fmt, template = "pdf", ("card" if fmt == "a6" else "poster")
-        if fmt not in ("png", "pdf", "image"):
-            raise ValidationError({"format": "format `png`, `pdf` yoki `image` bo'lishi kerak."})
-        if fmt != "png" and template not in qr_print.TEMPLATES:
+        if fmt not in ("png", "pdf", "image", "svg"):
+            raise ValidationError({"format": "format `png`, `pdf`, `image` yoki `svg` bo'lishi kerak."})
+        if fmt not in ("png", "svg") and template not in qr_print.TEMPLATES:
             raise ValidationError({"template": "Noma'lum shablon."})
 
         qr_options = _qr_options(params)
         design_options = _design_options(params)
         inline = params.get("inline") in ("1", "true")
+
+        if fmt == "svg":
+            svg_content = qr_codes.render_svg(restaurant.qr_url, color=qr_options.get("color", qr_codes.DEFAULT_COLOR))
+            response = HttpResponse(svg_content, content_type="image/svg+xml")
+            response["Content-Disposition"] = f'attachment; filename="{restaurant.slug}-qr.svg"'
+            return response
 
         if fmt == "png":
             rendered = qr_codes.restaurant_qr(restaurant, **qr_options)
