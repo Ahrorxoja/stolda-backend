@@ -7,7 +7,7 @@ almashtiradi, qayta so'rov yubormaydi.
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import Category, Dish, KcalSource, MenuView, Restaurant, ViewKind
+from .models import Category, Dish, KcalSource, MenuView, Restaurant, RestaurantLink, ViewKind
 
 
 def absolute_media_url(image, request=None) -> str | None:
@@ -28,9 +28,16 @@ class ImageUrlMixin:
         return absolute_media_url(image, self.context.get("request"))
 
 
+class RestaurantLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RestaurantLink
+        fields = ("id", "title", "url", "icon", "position")
+
+
 class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
     logo = serializers.SerializerMethodField()
     cover = serializers.SerializerMethodField()
+    custom_links = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -52,6 +59,7 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
             "cover",
             "service_charge_percent",
             "is_listed",
+            "custom_links",
         )
 
     def get_logo(self, obj: Restaurant) -> str | None:
@@ -59,6 +67,12 @@ class RestaurantSerializer(ImageUrlMixin, serializers.ModelSerializer):
 
     def get_cover(self, obj: Restaurant) -> str | None:
         return self._image_url(obj.cover)
+
+    def get_custom_links(self, obj: Restaurant) -> list[dict]:
+        links = getattr(obj, "prefetched_custom_links", None)
+        if links is None:
+            links = obj.custom_links.filter(is_visible=True)
+        return RestaurantLinkSerializer(links, many=True).data
 
 
 class CategorySerializer(ImageUrlMixin, serializers.ModelSerializer):

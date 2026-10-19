@@ -9,8 +9,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ai.client import AiError
+from .ai_assistant import ask_ai_waiter
 from .cache import MENU_TTL_SECONDS, inactive_menu_cache_key, menu_cache_key, schedule_flag_key
-from .models import Dish, DishPhoto, Restaurant, Subscription
+from .models import AiQueryLog, Dish, DishPhoto, Restaurant, Subscription
 from .serializers import (
     CategorySerializer,
     DishSerializer,
@@ -46,6 +48,8 @@ class PublicMenuView(APIView):
         cached = cache.get(key)
         if cached is not None:
             return Response(cached)
+
+        restaurant.prefetched_custom_links = list(restaurant.custom_links.filter(is_visible=True))
 
         available = (
             Dish.objects.filter(is_available=True)
@@ -173,3 +177,57 @@ class PublicSitemapView(APIView):
                 for restaurant in restaurants
             ]
         )
+
+
+class PublicAiAssistantView(APIView):
+    """`POST /api/public/{slug}/ai-assistant/` — QR menyudagi AI Ofitsiant bilan muloqot."""
+
+    permission_classes = (AllowAny,)
+    throttle_scope = "ai"
+
+    def post(self, request, slug: str):
+        restaurant = _get_restaurant(slug)
+        user_message = str(request.data.get("message") or "").strip()
+        if not user_message:
+            return Response(
+                {"error": "Message is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        history = request.data.get("history") or []
+        lang = str(request.data.get("lang") or "uz").strip()
+
+        available = (
+            Dish.objects.filter(is_available=True)
+            .order_by("position", "id")
+        )
+        categories = [
+            cat
+            for cat in restaurant.categories.prefetch_related(
+                Prefetch("dishes", queryset=available, to_attr="available_dishes")
+            )
+            if cat.is_visible
+        ]
+        dishes = [dish for cat in categories for dish in cat.available_dishes]
+
+        try:
+            reply = ask_ai_waiter(
+                restaurant=restaurant,
+                categories=categories,
+                dishes=dishes,
+                user_message=user_message,
+                history=history,
+                lang=lang,
+            )
+            AiQueryLog.objects.create(
+                restaurant=restaurant,
+                query_text=user_message[:500],
+                lang=lang,
+            )
+            return Response({"reply": reply})
+        except AiError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+

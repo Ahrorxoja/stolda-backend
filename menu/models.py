@@ -821,3 +821,44 @@ class MenuView(models.Model):
 
     def __str__(self) -> str:
         return f"{self.restaurant.slug} · {self.kind} · {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class AiQueryLog(models.Model):
+    """Mijozlarning AI Ofitsiantdan so'ragan savollari jurnali — statistikalar uchun."""
+
+    restaurant = models.ForeignKey(
+        Restaurant, on_delete=models.CASCADE, related_name="ai_query_logs"
+    )
+    query_text = models.CharField(max_length=500)
+    lang = models.CharField(max_length=10, default="uz")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.restaurant.slug}: {self.query_text[:30]}"
+
+
+class RestaurantLink(models.Model):
+    """Restoranning dinamik tashqi havolalari (Yandex Maps, Google Maps, 2GIS, Wifi, etc.)."""
+
+    restaurant = models.ForeignKey(
+        Restaurant, on_delete=models.CASCADE, related_name="custom_links"
+    )
+    title = models.JSONField(
+        default=empty_translation, validators=[validate_translation], blank=True
+    )
+    url = models.URLField(max_length=500)
+    icon = models.CharField(max_length=50, default="link")
+    position = models.PositiveIntegerField(default=0)
+    is_visible = models.BooleanField(default=True)
+    translation_meta = models.JSONField(
+        default=dict, validators=[validate_translation_meta], blank=True
+    )
+
+    class Meta:
+        ordering = ("position", "id")
+
+    def __str__(self) -> str:
+        return f"{self.restaurant.slug} · {self.url}"

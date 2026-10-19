@@ -98,6 +98,21 @@ class GeminiClient:
             logger.warning("Gemini JSON qaytarmadi: %s", str(raw)[:200])
             raise AiError("Gemini JSON qaytarmadi.") from error
 
+    def generate_text(self, system: str, contents: list[dict], temperature: float = 0.3) -> str:
+        """Suhbat tarixi (contents) va system prompt bilan matnli javob oladi."""
+        payload = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+            },
+        }
+        body = self._post(payload)
+        try:
+            return body["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError, TypeError) as error:
+            raise AiError("Gemini javobi kutilganidek emas.") from error
+
     def _ordered_keys(self) -> list[str]:
         """Dam olayotgan kalitlar oxiriga — boshqa iloj qolmasa baribir sinaladi."""
         now = time.monotonic()

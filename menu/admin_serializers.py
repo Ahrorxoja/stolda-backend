@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from . import qr as qr_codes
 from .images import to_webp
-from .models import Badge, Category, Dish, DishPhoto, KcalSource, Profile, Restaurant
+from .models import Badge, Category, Dish, DishPhoto, KcalSource, Profile, Restaurant, RestaurantLink
 from .permissions import is_member
 from .phones import (
     MAX_EXTRA_PHONES,
@@ -247,6 +247,37 @@ class RestaurantAdminSerializer(ImageUrlMixin, serializers.ModelSerializer):
             if key in attrs:
                 attrs[key] = " ".join((attrs[key] or "").split())
         return attrs
+
+
+class RestaurantLinkAdminSerializer(ManualHashMixin, serializers.ModelSerializer):
+    title = TranslatedField()
+    translation_meta = TranslationMetaField(required=False)
+
+    class Meta:
+        model = RestaurantLink
+        fields = (
+            "id",
+            "restaurant",
+            "title",
+            "url",
+            "icon",
+            "position",
+            "is_visible",
+            "translation_meta",
+        )
+
+    def validate_restaurant(self, value: Restaurant) -> Restaurant:
+        if not is_member(value, self.context["request"].user):
+            raise serializers.ValidationError("Bu restoran sizga tegishli emas.")
+        return value
+
+    def validate_url(self, value: str) -> str:
+        value = value.strip()
+        import re
+        value = re.sub(r"^(https?://)+", r"\1", value, flags=re.IGNORECASE)
+        if not (value.startswith("http://") or value.startswith("https://")):
+            value = f"https://{value}"
+        return value
 
 
 class CategoryAdminSerializer(ManualHashMixin, ImageUrlMixin, serializers.ModelSerializer):

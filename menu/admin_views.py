@@ -24,9 +24,11 @@ from .admin_serializers import (
     DishPhotoSerializer,
     PositionSerializer,
     RestaurantAdminSerializer,
+    RestaurantLinkAdminSerializer,
     TranslatePreviewSerializer,
 )
 from .models import (
+    AiQueryLog,
     Category,
     Dish,
     DishPhoto,
@@ -34,6 +36,7 @@ from .models import (
     Plan,
     Profile,
     Restaurant,
+    RestaurantLink,
     RestaurantMember,
     Subscription,
     ViewKind,
@@ -85,6 +88,19 @@ class OwnerScopedViewSet(viewsets.ModelViewSet):
         # bulk_update signal yubormaydi — keshni o'zimiz yangilaymiz.
         self._invalidate()
         return Response({"updated": len(objects)})
+
+
+class RestaurantLinkViewSet(OwnerScopedViewSet):
+    serializer_class = RestaurantLinkAdminSerializer
+
+    def get_queryset(self):
+        return RestaurantLink.objects.filter(
+            restaurant_id__in=member_restaurant_ids(self.request.user)
+        )
+
+    @action(detail=False, methods=["post"])
+    def reorder(self, request):
+        return super().reorder(request)
 
     def _own_restaurant(self) -> Restaurant | None:
         return Restaurant.objects.filter(pk__in=member_restaurant_ids(self.request.user)).first()
@@ -747,3 +763,56 @@ def _change(current: int, previous: int) -> float | None:
     if not previous:
         return None
     return round((current - previous) / previous * 100, 1)
+
+
+class AiStatsView(APIView):
+    """`GET /api/stats/ai/` — AI Ofitsiant statistikasi va so'rovlar analitikasi (Admin)."""
+
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        restaurant = self._restaurant(request)
+        logs = AiQueryLog.objects.filter(restaurant=restaurant)
+
+        total_queries = logs.count()
+        recent_logs = [
+            {
+                "id": log.id,
+                "query": log.query_text,
+                "lang": log.lang,
+                "created_at": log.created_at.isoformat(),
+            }
+            for log in logs[:20]
+        ]
+
+        import re
+        from collections import Counter
+
+        words = []
+        for query in logs.values_list("query_text", flat=True)[:100]:
+            clean = re.sub(r"[^\w\s]", "", query.lower())
+            for word in clean.split():
+                if len(word) > 2 and word not in ("bilan", "nima", "qancha", "bor", "kerak", "tavsiya", "som", "so'm", "haqida"):
+                    words.append(word)
+
+        top_topics = [
+            {"topic": word, "count": count}
+            for word, count in Counter(words).most_common(5)
+        ]
+
+        return Response({
+            "total_queries": total_queries,
+            "top_topics": top_topics,
+            "recent_queries": recent_logs,
+        })
+
+    def _restaurant(self, request) -> Restaurant:
+        queryset = Restaurant.objects.filter(pk__in=member_restaurant_ids(request.user))
+        restaurant_id = request.query_params.get("restaurant")
+        if restaurant_id:
+            queryset = queryset.filter(pk=restaurant_id)
+        restaurant = queryset.first()
+        if restaurant is None:
+            raise PermissionDenied("Restoran topilmadi.")
+        return restaurant
+

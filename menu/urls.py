@@ -3,11 +3,13 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .admin_views import (
+    AiStatsView,
     CategoryViewSet,
     DishPhotoViewSet,
     DishViewSet,
     MeView,
     RestaurantViewSet,
+    RestaurantLinkViewSet,
     PlatformOverviewView,
     StatsView,
     TranslatePreviewView,
@@ -31,19 +33,21 @@ from .member_views import (
 from agents import platform_views
 
 from .telegram_views import ActivityUndoView, ActivityView, TelegramAuthView, TelegramLinkView
-from .views import PublicMenuView, PublicSitemapView, PublicViewEventView
+from .views import PublicAiAssistantView, PublicMenuView, PublicSitemapView, PublicViewEventView
 
 router = DefaultRouter()
 router.register("restaurants", RestaurantViewSet, basename="restaurant")
 router.register("categories", CategoryViewSet, basename="category")
 router.register("dishes", DishViewSet, basename="dish")
 router.register("dish-photos", DishPhotoViewSet, basename="dish-photo")
+router.register("links", RestaurantLinkViewSet, basename="link")
 
 urlpatterns = [
     # Public — QR skanerlagan mijoz uchun
     path("public/sitemap/", PublicSitemapView.as_view(), name="public-sitemap"),
     path("public/<slug:slug>/menu/", PublicMenuView.as_view(), name="public-menu"),
     path("public/<slug:slug>/views/", PublicViewEventView.as_view(), name="public-views"),
+    path("public/<slug:slug>/ai-assistant/", PublicAiAssistantView.as_view(), name="public-ai-assistant"),
     # Admin — JWT
     path("auth/signup/", SignupView.as_view(), name="signup"),
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
@@ -55,6 +59,7 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("me/", MeView.as_view(), name="me"),
     path("stats/", StatsView.as_view(), name="stats"),
+    path("stats/ai/", AiStatsView.as_view(), name="stats-ai"),
     path("platform/overview/", PlatformOverviewView.as_view(), name="platform-overview"),
     path("platform/agents/", platform_views.AgentListView.as_view(), name="platform-agents"),
     path("platform/agents/<int:pk>/", platform_views.AgentDetailView.as_view(), name="platform-agent"),
