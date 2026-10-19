@@ -93,6 +93,8 @@ def authenticate(tg_user: dict, payload: str = "", confirm: bool = False) -> dic
     if payload.startswith("L"):
         token = TelegramLinkToken.objects.select_related("user").filter(token=payload[1:]).first()
         if token is None or not token.is_valid:
+            if linked:
+                return tokens(linked.user)
             raise LinkError("Havola eskirgan yoki ishlatilgan. Admin panelda «Telegram'ni ulash» ni qayta bosing.")
         restaurant = restaurant_of(token.user)
         if not confirm:
@@ -117,6 +119,8 @@ def authenticate(tg_user: dict, payload: str = "", confirm: bool = False) -> dic
             .first()
         )
         if invite is None or not invite.is_pending:
+            if linked:
+                return tokens(linked.user)
             raise LinkError("Taklif eskirgan yoki ishlatilgan. Restoran egasidan yangisini so'rang.")
         if linked:
             memberships = RestaurantMember.objects.filter(user=linked.user)
@@ -136,6 +140,8 @@ def authenticate(tg_user: dict, payload: str = "", confirm: bool = False) -> dic
         with transaction.atomic():
             invite = RestaurantInvite.objects.select_for_update().get(pk=invite.pk)
             if not invite.is_pending:
+                if linked:
+                    return tokens(linked.user)
                 raise LinkError("Taklif allaqachon ishlatilgan.")
             if linked:
                 user = linked.user
