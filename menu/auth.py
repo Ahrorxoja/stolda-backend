@@ -132,7 +132,10 @@ class GoogleAuthSerializer(serializers.Serializer):
             )
         try:
             payload = google_id_token.verify_oauth2_token(
-                value, google_requests.Request(), audience=settings.GOOGLE_CLIENT_ID
+                value,
+                google_requests.Request(),
+                audience=settings.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=10,
             )
         except ValueError as error:
             raise serializers.ValidationError(f"Google tokeni yaroqsiz: {error}") from error
