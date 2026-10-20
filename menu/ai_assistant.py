@@ -16,106 +16,59 @@ logger = logging.getLogger(__name__)
 
 
 def build_menu_context(restaurant: Restaurant, categories: list, dishes: list, lang: str = "uz") -> str:
-    """Restoran va uning mavjud menyusini Gemini tushunadigan ixcham matnga o'giradi."""
-    lines = [
-        f"RESTORAN NOMI: {restaurant.name}",
-    ]
+    """Restoran va uning mavjud menyusini Gemini tushunadigan o'ta ixcham matnga o'giradi."""
+    lines = [f"RESTORAN: {restaurant.name}"]
 
+    info_parts = []
     if restaurant.address:
-        addr_text = (
-            restaurant.address.get(lang)
-            or restaurant.address.get(restaurant.primary_language)
-            or ""
-        )
-        if addr_text:
-            lines.append(f"Manzil: {addr_text}")
-
-    phones = []
+        addr = restaurant.address.get(lang) or restaurant.address.get(restaurant.primary_language) or ""
+        if addr:
+            info_parts.append(f"Manzil: {addr}")
     if restaurant.phone:
-        phones.append(restaurant.phone)
-    if restaurant.extra_phones:
-        phones.extend(restaurant.extra_phones)
-    if restaurant.delivery_phones:
-        phones.extend(restaurant.delivery_phones)
-    if phones:
-        lines.append(f"Telefon raqamlar: {', '.join(phones)}")
-
-    if restaurant.cuisine:
-        cuisine_text = (
-            restaurant.cuisine.get(lang)
-            or restaurant.cuisine.get(restaurant.primary_language)
-            or ""
-        )
-        if cuisine_text:
-            lines.append(f"Oshxona turi: {cuisine_text}")
-
+        info_parts.append(f"Tel: {restaurant.phone}")
     if restaurant.service_charge_percent:
-        lines.append(f"Xizmat haqi: {restaurant.service_charge_percent}%")
+        info_parts.append(f"Xizmat: {restaurant.service_charge_percent}%")
+    if info_parts:
+        lines.append(" | ".join(info_parts))
 
-    if restaurant.instagram:
-        lines.append(f"Instagram: {restaurant.instagram}")
-
-    lines.append("\n=== MENYU VA TAOMLAR RO'YXATI ===")
+    lines.append("\n=== MENYU ===")
 
     dish_map = {}
     for dish in dishes:
         dish_map.setdefault(dish.category_id, []).append(dish)
 
     for cat in categories:
-        cat_name = (
-            cat.name.get(lang)
-            or cat.name.get(restaurant.primary_language)
-            or str(cat.id)
-        )
+        cat_name = cat.name.get(lang) or cat.name.get(restaurant.primary_language) or str(cat.id)
         cat_dishes = dish_map.get(cat.id, [])
         if not cat_dishes:
             continue
 
-        lines.append(f"\nKategoriya: [{cat_name}]")
+        lines.append(f"\n[{cat_name}]:")
         for dish in cat_dishes:
-            d_name = (
-                dish.name.get(lang)
-                or dish.name.get(restaurant.primary_language)
-                or ""
-            )
-            d_desc = (
-                dish.description.get(lang)
-                or dish.description.get(restaurant.primary_language)
-                or ""
-            )
+            d_name = dish.name.get(lang) or dish.name.get(restaurant.primary_language) or ""
+            if not d_name:
+                continue
+
+            price_str = f"{dish.price:,}".replace(",", " ") + " so'm"
+            meta = []
+            if dish.weight:
+                meta.append(f"{dish.weight}{dish.unit or ''}")
+            if dish.badges:
+                meta.append(", ".join(dish.badges))
 
             d_ing = ""
             if dish.ingredients and isinstance(dish.ingredients, dict):
-                ing_list = (
-                    dish.ingredients.get(lang)
-                    or dish.ingredients.get(restaurant.primary_language)
-                    or []
-                )
+                ing_list = dish.ingredients.get(lang) or dish.ingredients.get(restaurant.primary_language) or []
                 if ing_list:
-                    d_ing = ", ".join(ing_list)
+                    d_ing = ", ".join(ing_list[:4])
 
-            price_str = f"{dish.price:,}".replace(",", " ") + " so'm"
-            portion_str = f"{dish.weight} {dish.unit}" if dish.weight else ""
-            kcal_str = f"≈{dish.kcal} kkal" if dish.kcal else ""
-            badges_str = f"[{', '.join(dish.badges)}]" if dish.badges else ""
+            d_desc = dish.description.get(lang) or dish.description.get(restaurant.primary_language) or ""
+            desc_snippet = (d_ing or d_desc[:60]).replace("\n", " ")
 
-            details = []
-            if portion_str:
-                details.append(portion_str)
-            if kcal_str:
-                details.append(kcal_str)
-            if badges_str:
-                details.append(badges_str)
+            meta_str = f" ({'; '.join(meta)})" if meta else ""
+            desc_str = f" | {desc_snippet}" if desc_snippet else ""
 
-            dish_line = f"- ID:{dish.id} | {d_name} — {price_str}"
-            if details:
-                dish_line += f" ({', '.join(details)})"
-            if d_desc:
-                dish_line += f"\n  Tavsif: {d_desc}"
-            if d_ing:
-                dish_line += f"\n  Tarkibi: {d_ing}"
-
-            lines.append(dish_line)
+            lines.append(f"- {d_name} — {price_str}{meta_str}{desc_str}")
 
     return "\n".join(lines)
 
