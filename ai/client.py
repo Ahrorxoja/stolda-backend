@@ -67,7 +67,7 @@ class GeminiClient:
         self,
         keys: str | Sequence[str],
         models: str | Sequence[str] = DEFAULT_MODEL,
-        timeout: int = 5,
+        timeout: int = 15,
         session: requests.Session | None = None,
     ):
         self.keys = [keys] if isinstance(keys, str) else list(keys)
