@@ -7,7 +7,7 @@ va faqat shu menyu asosida samimiy, oddiy odamdek muloqot qiladi.
 import logging
 from typing import Any
 
-from ai.client import AiError, get_client
+from ai.client import AiError, get_client, get_grok_client
 from menu.models import Restaurant
 
 logger = logging.getLogger(__name__)
@@ -154,8 +154,9 @@ def ask_ai_waiter(
     history: list[dict[str, str]] | None = None,
     lang: str = "uz",
 ) -> str:
-    """Gemini API chaqiradi va AI Ofitsiant javobini qaytaradi."""
+    """Gemini API (va zaxirada Grok API) chaqiradi va AI Ofitsiant javobini qaytaradi."""
     client = get_client()
+    grok_client = get_grok_client()
     menu_context = build_menu_context(restaurant, categories, dishes, lang=lang)
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         restaurant_name=restaurant.name, lang=lang, menu_context=menu_context
@@ -171,11 +172,19 @@ def ask_ai_waiter(
 
     contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-    if not client:
+    if client:
+        try:
+            return client.generate_text(system=system_prompt, contents=contents, temperature=0.4)
+        except AiError as e:
+            logger.warning("Gemini API xatosi, Grok'ga o'tilmoqda: %s", str(e))
+
+    if grok_client:
+        try:
+            return grok_client.generate_text(system=system_prompt, contents=contents, temperature=0.4)
+        except AiError as e:
+            logger.error("Grok API ham xato berdi: %s", str(e))
+
+    if not client and not grok_client:
         return f"Assalomu alaykum! Men {restaurant.name} restoranining AI ofitsiantiman. Bugun sizga qanday taom tavsiya qilishim mumkin?"
 
-    try:
-        return client.generate_text(system=system_prompt, contents=contents, temperature=0.4)
-    except AiError as e:
-        logger.error("AI Ofitsiant xatoligi: %s", str(e))
-        raise
+    raise AiError("AI hozir band, birozdan keyin qayta urinib ko'ring.")

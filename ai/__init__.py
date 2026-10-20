@@ -8,7 +8,15 @@ from .assistant import (
     KcalEstimate,
     get_assistant,
 )
-from .client import AiError, GeminiClient, configured_keys, configured_models, get_client
+from .client import (
+    AiError,
+    GeminiClient,
+    GrokClient,
+    configured_keys,
+    configured_models,
+    get_client,
+    get_grok_client,
+)
 
 __all__ = [
     "AiError",
@@ -17,9 +25,11 @@ __all__ = [
     "FakeAssistant",
     "GeminiAssistant",
     "GeminiClient",
+    "GrokClient",
     "KcalEstimate",
     "configured_keys",
     "configured_models",
     "get_assistant",
     "get_client",
+    "get_grok_client",
 ]

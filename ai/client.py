@@ -190,3 +190,58 @@ def get_client() -> GeminiClient | None:
     if not keys:
         return None
     return GeminiClient(keys, configured_models())
+
+
+class GrokClient:
+    """xAI Grok API mijozi — Gemini ishlamay qolganda zaxira (fallback) provayder."""
+
+    def __init__(self, key: str, model: str = "grok-2-mini", timeout: int = 10):
+        self.key = key
+        self.model = model
+        self.timeout = timeout
+        self.session = requests.Session()
+
+    def generate_text(self, system: str, contents: list[dict], temperature: float = 0.4) -> str:
+        messages = [{"role": "system", "content": system}]
+        for item in contents:
+            role = "assistant" if item.get("role") in ("model", "assistant") else "user"
+            text = ""
+            if "parts" in item and item["parts"]:
+                text = item["parts"][0].get("text", "")
+            elif "content" in item:
+                text = str(item["content"])
+            if text:
+                messages.append({"role": role, "content": text})
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+
+        try:
+            res = self.session.post(
+                "https://api.x.ai/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.key}",
+                },
+                json=payload,
+                timeout=self.timeout,
+            )
+            if res.ok:
+                data = res.json()
+                return data["choices"][0]["message"]["content"]
+            logger.warning("Grok API xatosi (%s): %s", res.status_code, res.text[:200])
+            raise AiError("Grok API javob bermadi.")
+        except requests.RequestException as e:
+            logger.warning("Grok API tarmoq xatosi: %s", str(e))
+            raise AiError("Grok API'ga ulanib bo'lmadi.") from e
+
+
+def get_grok_client() -> GrokClient | None:
+    key = (getattr(settings, "XAI_GROK_API_KEY", "") or "").strip()
+    if not key:
+        return None
+    model = getattr(settings, "XAI_GROK_MODEL", "grok-2-mini") or "grok-2-mini"
+    return GrokClient(key, model)
