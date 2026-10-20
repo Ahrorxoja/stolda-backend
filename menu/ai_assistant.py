@@ -9,7 +9,7 @@ from typing import Any
 
 from django.core.cache import cache
 
-from ai.client import AiError, get_client, get_grok_client
+from ai.client import AiError, get_client, get_grok_client, get_groq_client
 from menu.models import Restaurant
 
 logger = logging.getLogger(__name__)
@@ -123,7 +123,8 @@ def ask_ai_waiter(
     history: list[dict[str, str]] | None = None,
     lang: str = "uz",
 ) -> str:
-    """Gemini API (va zaxirada Grok API) chaqiradi va AI Ofitsiant javobini qaytaradi."""
+    """Groq API (va zaxirada Gemini/xAI Grok API) chaqiradi va AI Ofitsiant javobini qaytaradi."""
+    groq_client = get_groq_client()
     client = get_client()
     grok_client = get_grok_client()
     menu_context = get_cached_menu_context(restaurant, categories, dishes, lang=lang)
@@ -143,6 +144,12 @@ def ask_ai_waiter(
 
     contents.append({"role": "user", "parts": [{"text": user_message}]})
 
+    if groq_client:
+        try:
+            return groq_client.generate_text(system=system_prompt, contents=contents, temperature=0.3)
+        except AiError as e:
+            logger.warning("Groq API xatosi, Gemini'ga o'tilmoqda: %s", str(e))
+
     if client:
         try:
             return client.generate_text(system=system_prompt, contents=contents, temperature=0.4)
@@ -155,7 +162,7 @@ def ask_ai_waiter(
         except AiError as e:
             logger.error("Grok API ham xato berdi: %s", str(e))
 
-    if not client and not grok_client:
+    if not groq_client and not client and not grok_client:
         return f"Assalomu alaykum! Men {restaurant.name} restoranining AI ofitsiantiman. Bugun sizga qanday taom tavsiya qilishim mumkin?"
 
     raise AiError("AI hozir band, birozdan keyin qayta urinib ko'ring.")
