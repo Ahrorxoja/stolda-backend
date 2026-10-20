@@ -7,6 +7,8 @@ va faqat shu menyu asosida samimiy, oddiy odamdek muloqot qiladi.
 import logging
 from typing import Any
 
+from django.core.cache import cache
+
 from ai.client import AiError, get_client, get_grok_client
 from menu.models import Restaurant
 
@@ -118,6 +120,18 @@ def build_menu_context(restaurant: Restaurant, categories: list, dishes: list, l
     return "\n".join(lines)
 
 
+def get_cached_menu_context(restaurant: Restaurant, categories: list, dishes: list, lang: str = "uz") -> str:
+    """Restoran menyusi va ma'lumotlarini keshda saqlaydi (1 soat TTL)."""
+    cache_key = f"ai_menu_ctx_v2_{restaurant.id}_{lang}"
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    context = build_menu_context(restaurant, categories, dishes, lang=lang)
+    cache.set(cache_key, context, timeout=3600)
+    return context
+
+
 SYSTEM_PROMPT_TEMPLATE = """Siz "{restaurant_name}" restoranining samimiy, xushmuomala, chaqqon va juda bilimdon AI ofitsiantisiz.
 
 Sizning vazifangiz:
@@ -157,14 +171,16 @@ def ask_ai_waiter(
     """Gemini API (va zaxirada Grok API) chaqiradi va AI Ofitsiant javobini qaytaradi."""
     client = get_client()
     grok_client = get_grok_client()
-    menu_context = build_menu_context(restaurant, categories, dishes, lang=lang)
+    menu_context = get_cached_menu_context(restaurant, categories, dishes, lang=lang)
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         restaurant_name=restaurant.name, lang=lang, menu_context=menu_context
     )
 
     contents = []
     if history:
-        for msg in history:
+        # Tarixning faqat eng so'nggi 4 ta xabarini olamiz (tezlik va token tejamkorligi uchun)
+        recent_history = history[-4:]
+        for msg in recent_history:
             role = "user" if msg.get("role") == "user" else "model"
             text = msg.get("text", "")
             if text:

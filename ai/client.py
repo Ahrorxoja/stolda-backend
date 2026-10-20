@@ -114,13 +114,19 @@ class GeminiClient:
             raise AiError("Gemini javobi kutilganidek emas.") from error
 
     def _ordered_keys(self) -> list[str]:
-        """Dam olayotgan kalitlar oxiriga — boshqa iloj qolmasa baribir sinaladi."""
+        """Kalitlarni navbatma-navbat (Round-Robin) va dam olayotganlarini oxiriga qo'yib beradi."""
         now = time.monotonic()
         with _lock:
             resting = {key for key in self.keys if _cooldown.get(_fingerprint(key), 0) > now}
-        return [key for key in self.keys if key not in resting] + [
-            key for key in self.keys if key in resting
-        ]
+
+        active = [key for key in self.keys if key not in resting]
+        inactive = [key for key in self.keys if key in resting]
+
+        if len(active) > 1:
+            offset = random.randint(0, len(active) - 1)
+            active = active[offset:] + active[:offset]
+
+        return active + inactive
 
     def _rest(self, key: str) -> None:
         with _lock:
@@ -128,28 +134,31 @@ class GeminiClient:
 
     def _post(self, payload: dict) -> dict:
         last: requests.Response | None = None
-        for model in self.models:
-            for key in self._ordered_keys():
-                response = self._send(model, key, payload)
-                if response is None:
+        for attempt in range(2):
+            for model in self.models:
+                for key in self._ordered_keys():
+                    response = self._send(model, key, payload)
+                    if response is None:
+                        self._rest(key)
+                        continue
+                    if response.ok:
+                        try:
+                            return response.json()
+                        except ValueError as error:
+                            raise AiError("Gemini javobini o'qib bo'lmadi.") from error
+                    last = response
+                    if response.status_code in (429, 500, 503):
+                        logger.warning("Gemini kaliti %s vaqtincha ishlamadi (%s - %s)", _fingerprint(key), model, response.status_code)
+                        self._rest(key)
+                        continue
+                    if response.status_code in (401, 403):
+                        logger.error("Gemini kaliti %s rad etildi (%s)", _fingerprint(key), model)
+                        self._rest(key)
+                        continue
                     self._rest(key)
                     continue
-                if response.ok:
-                    try:
-                        return response.json()
-                    except ValueError as error:
-                        raise AiError("Gemini javobini o'qib bo'lmadi.") from error
-                last = response
-                if response.status_code in (429, 500, 503):
-                    logger.warning("Gemini kaliti %s vaqtincha ishlamadi (%s - %s)", _fingerprint(key), model, response.status_code)
-                    self._rest(key)
-                    continue
-                if response.status_code in (401, 403):
-                    logger.error("Gemini kaliti %s rad etildi (%s)", _fingerprint(key), model)
-                    self._rest(key)
-                    continue
-                self._rest(key)
-                continue
+            if attempt == 0:
+                time.sleep(0.5)
         raise AiError(self._failure(last))
 
     def _send(self, model: str, key: str, payload: dict) -> requests.Response | None:
