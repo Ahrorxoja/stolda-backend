@@ -140,15 +140,13 @@ class GeminiClient:
                     except ValueError as error:
                         raise AiError("Gemini javobini o'qib bo'lmadi.") from error
                 last = response
-                if response.status_code == 429:
-                    logger.warning("Gemini kaliti %s limitga uchradi (%s)", _fingerprint(key), model)
+                if response.status_code in (429, 500, 503):
+                    logger.warning("Gemini kaliti %s vaqtincha ishlamadi (%s - %s)", _fingerprint(key), model, response.status_code)
                     self._rest(key)
                     continue
                 if response.status_code in (401, 403):
                     logger.error("Gemini kaliti %s rad etildi (%s)", _fingerprint(key), model)
                     self._rest(key)
-                    continue
-                if response.status_code in (500, 503):
                     continue
                 # 400 kabi xatolar — so'rovning o'zi noto'g'ri, boshqa kalit yordam bermaydi.
                 raise AiError(self._failure(response))
