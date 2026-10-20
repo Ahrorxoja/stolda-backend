@@ -24,10 +24,10 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash"
 
 #: Limitga uchragan kalit shuncha soniya ishlatilmaydi.
-COOLDOWN_SECONDS = 60
+COOLDOWN_SECONDS = 10
 
 _cooldown: dict[str, float] = {}
 _lock = threading.Lock()
@@ -99,13 +99,14 @@ class GeminiClient:
             logger.warning("Gemini JSON qaytarmadi: %s", str(raw)[:200])
             raise AiError("Gemini JSON qaytarmadi.") from error
 
-    def generate_text(self, system: str, contents: list[dict], temperature: float = 0.3) -> str:
+    def generate_text(self, system: str, contents: list[dict], temperature: float = 0.2) -> str:
         """Suhbat tarixi (contents) va system prompt bilan matnli javob oladi."""
         payload = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": contents,
             "generationConfig": {
                 "temperature": temperature,
+                "thinkingConfig": {"thinkingBudget": 0},
             },
         }
         body = self._post(payload)
