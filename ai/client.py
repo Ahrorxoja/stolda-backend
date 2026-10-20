@@ -66,7 +66,7 @@ class GeminiClient:
         self,
         keys: str | Sequence[str],
         models: str | Sequence[str] = DEFAULT_MODEL,
-        timeout: int = 30,
+        timeout: int = 10,
         session: requests.Session | None = None,
     ):
         self.keys = [keys] if isinstance(keys, str) else list(keys)
@@ -131,9 +131,9 @@ class GeminiClient:
         for model in self.models:
             for key in self._ordered_keys():
                 response = self._send(model, key, payload)
-                # "Band" (500/503) — o'sha kalit bilan bir marta qaytaramiz.
-                if response.status_code in (500, 503):
-                    response = self._send(model, key, payload)
+                if response is None:
+                    self._rest(key)
+                    continue
                 if response.ok:
                     try:
                         return response.json()
@@ -148,11 +148,11 @@ class GeminiClient:
                     logger.error("Gemini kaliti %s rad etildi (%s)", _fingerprint(key), model)
                     self._rest(key)
                     continue
-                # 400 kabi xatolar — so'rovning o'zi noto'g'ri, boshqa kalit yordam bermaydi.
-                raise AiError(self._failure(response))
+                self._rest(key)
+                continue
         raise AiError(self._failure(last))
 
-    def _send(self, model: str, key: str, payload: dict) -> requests.Response:
+    def _send(self, model: str, key: str, payload: dict) -> requests.Response | None:
         try:
             return self.session.post(
                 f"{API_ROOT}/{model}:generateContent",
@@ -162,7 +162,8 @@ class GeminiClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as error:
-            raise AiError("Gemini API'ga ulanib bo'lmadi.") from error
+            logger.warning("Gemini kaliti %s tarmoq xatosi: %s", _fingerprint(key), str(error))
+            return None
 
     @staticmethod
     def _failure(response: requests.Response | None) -> str:
