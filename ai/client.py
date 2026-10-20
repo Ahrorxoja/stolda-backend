@@ -23,7 +23,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_MODEL = "gemini-1.5-flash"
 
 #: Limitga uchragan kalit shuncha soniya ishlatilmaydi.
 COOLDOWN_SECONDS = 60
