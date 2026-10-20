@@ -67,7 +67,7 @@ class GeminiClient:
         self,
         keys: str | Sequence[str],
         models: str | Sequence[str] = DEFAULT_MODEL,
-        timeout: int = 10,
+        timeout: int = 5,
         session: requests.Session | None = None,
     ):
         self.keys = [keys] if isinstance(keys, str) else list(keys)
@@ -136,9 +136,12 @@ class GeminiClient:
 
     def _post(self, payload: dict) -> dict:
         last: requests.Response | None = None
+        start_time = time.monotonic()
         for attempt in range(2):
             for model in self.models:
                 for key in self._ordered_keys():
+                    if time.monotonic() - start_time > 10:
+                        break
                     response = self._send(model, key, payload)
                     if response is None:
                         self._rest(key)
@@ -159,8 +162,8 @@ class GeminiClient:
                         continue
                     self._rest(key)
                     continue
-            if attempt == 0:
-                time.sleep(0.5)
+            if attempt == 0 and time.monotonic() - start_time < 4:
+                time.sleep(0.3)
         raise AiError(self._failure(last))
 
     def _send(self, model: str, key: str, payload: dict) -> requests.Response | None:
