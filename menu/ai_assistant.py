@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_menu_context(restaurant: Restaurant, categories: list, dishes: list, lang: str = "uz") -> str:
-    """Restoran va uning mavjud menyusini Gemini tushunadigan o'ta ixcham matnga o'giradi."""
+    """Restoran va uning mavjud menyusini Gemini/Groq tushunadigan o'ta ixcham matnga o'giradi."""
     lines = [f"RESTORAN: {restaurant.name}"]
 
     info_parts = []
@@ -50,32 +50,16 @@ def build_menu_context(restaurant: Restaurant, categories: list, dishes: list, l
                 continue
 
             price_str = f"{dish.price:,}".replace(",", " ") + " so'm"
-            meta = []
-            if dish.weight:
-                meta.append(f"{dish.weight}{dish.unit or ''}")
-            if dish.badges:
-                meta.append(", ".join(dish.badges))
+            portion = f" ({dish.weight}{dish.unit or ''})" if dish.weight else ""
 
-            d_ing = ""
-            if dish.ingredients and isinstance(dish.ingredients, dict):
-                ing_list = dish.ingredients.get(lang) or dish.ingredients.get(restaurant.primary_language) or []
-                if ing_list:
-                    d_ing = ", ".join(ing_list[:4])
-
-            d_desc = dish.description.get(lang) or dish.description.get(restaurant.primary_language) or ""
-            desc_snippet = (d_ing or d_desc[:60]).replace("\n", " ")
-
-            meta_str = f" ({'; '.join(meta)})" if meta else ""
-            desc_str = f" | {desc_snippet}" if desc_snippet else ""
-
-            lines.append(f"- {d_name} — {price_str}{meta_str}{desc_str}")
+            lines.append(f"- {d_name} — {price_str}{portion}")
 
     return "\n".join(lines)
 
 
 def get_cached_menu_context(restaurant: Restaurant, categories: list, dishes: list, lang: str = "uz") -> str:
     """Restoran menyusi va ma'lumotlarini keshda saqlaydi (1 soat TTL)."""
-    cache_key = f"ai_menu_ctx_v2_{restaurant.id}_{lang}"
+    cache_key = f"ai_menu_ctx_v3_{restaurant.id}_{lang}"
     cached = cache.get(cache_key)
     if cached:
         return cached
