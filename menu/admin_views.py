@@ -70,6 +70,15 @@ RANGES = {"day": 1, "week": 7, "month": 30}
 class OwnerScopedViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated, IsRestaurantMember)
 
+    def _own_restaurant(self) -> Restaurant | None:
+        return Restaurant.objects.filter(pk__in=member_restaurant_ids(self.request.user)).first()
+
+    def _invalidate(self) -> None:
+        r = self._own_restaurant()
+        if r:
+            from .cache import bump_menu_version
+            bump_menu_version(r.slug)
+
     def reorder(self, request):
         """`POST .../reorder/` — `[{"id": …, "position": …}]`."""
         serializer = PositionSerializer(data=request.data, many=True)
