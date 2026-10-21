@@ -206,6 +206,12 @@ GEMINI_API_KEYS = os.getenv("GEMINI_API_KEYS", "")
 # Asosiy modelda hamma kalitlar limitga uchrasa — shu model sinaladi.
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "")
 
+# Groq va xAI Grok AI provayderlari
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+XAI_GROK_API_KEY = os.getenv("XAI_GROK_API_KEY", "")
+XAI_GROK_MODEL = os.getenv("XAI_GROK_MODEL", "grok-2-mini")
+
 # Google bilan kirish (parolsiz). Google Cloud Console'da yaratilgan
 # "OAuth 2.0 Client ID" (Web application) — frontend shu bilan ID token oladi,
 # bu yerda audience sifatida tekshiriladi.
