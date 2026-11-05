@@ -23,6 +23,7 @@ SECRET_KEY = os.getenv(
 )
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+APPEND_SLASH = False
 
 #: Mijozga ko'rinadigan manzil — QR kod va taklif havolalari shundan yasaladi.
 #: Localda `.env` da `SITE_URL=http://localhost:3000` qilib qo'yiladi.
